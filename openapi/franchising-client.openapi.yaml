@@ -1,0 +1,478 @@
+openapi: 3.1.0
+info:
+  title: Franchising Client API
+  version: 0.1.0
+  description: |
+    API для менеджера франшизы (ПВ). Логика совпадает с CRM franchising,
+    но доступ ограничен своим пунктом выдачи и своими заказами.
+
+    Контракт зафиксирован для согласования с бэкендом.
+    Часть путей уже существует в CRM; поля scope/enforce — требования к hardening.
+
+    Auth: cookie-сессия (как CRM) на первом этапе.
+    Обязательные серверные ограничения:
+      - user.role включает franchising (или эквивалент)
+      - все выборки заказов фильтруются по manager.branchId
+      - запрет доступа к чужим orderId / branchId (403)
+
+servers:
+  - url: /api
+    description: Vite proxy / gateway
+
+tags:
+  - name: Auth
+  - name: Orders
+  - name: Search
+  - name: OrderElements
+
+paths:
+  /user/crm_info:
+    get:
+      tags: [Auth]
+      summary: Текущий пользователь менеджера франшизы
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FranchiseUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /order/list:
+    get:
+      tags: [Orders]
+      summary: Список заказов текущего ПВ
+      operationId: listOrders
+      description: |
+        Сервер ОБЯЗАН игнорировать selectedBranch от клиента (или принимать только свой branchId)
+        и возвращать только заказы ПВ текущего менеджера.
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - name: phone
+          in: query
+          schema: { type: string }
+        - name: customer
+          in: query
+          schema: { type: string }
+        - name: article
+          in: query
+          schema: { type: string }
+        - name: car
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: priceFrom
+          in: query
+          schema: { type: string }
+        - name: priceTo
+          in: query
+          schema: { type: string }
+        - name: withoutInnerOrders
+          in: query
+          schema: { type: integer, enum: [1], default: 1 }
+      responses:
+        '200':
+          description: |
+            Legacy CRM shape: map status -> { orders: OrderListItem[] }
+            либо плоский массив OrderListItem[] (предпочтительно для нового клиента).
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/OrderListItem'
+                  - type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        orders:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/OrderListItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order/create_by_franchising:
+    post:
+      tags: [Orders]
+      summary: Создать заказ от менеджера франшизы
+      operationId: createFranchisingOrder
+      description: |
+        branchId и userId берутся из сессии на сервере (не доверять телу запроса).
+        warehouseId — склад назначения (Владивосток / ответхранение), если поддерживается.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateFranchisingOrderRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFranchisingOrderRequest'
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [orderId]
+                properties:
+                  orderId:
+                    type: integer
+                    description: Internal order id
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order/{orderId}:
+    get:
+      tags: [Orders]
+      summary: Карточка заказа
+      operationId: getOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /order/{orderId}/elements_for_manager_order_interface:
+    get:
+      tags: [OrderElements]
+      summary: Позиции заказа для интерфейса менеджера
+      operationId: getOrderElements
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [elements]
+                properties:
+                  elements:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OrderElement'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order/{orderId}/add_element:
+    post:
+      tags: [OrderElements]
+      summary: Добавить позицию в заказ
+      operationId: addOrderElement
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [itemId]
+              properties:
+                itemId:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order/{orderId}/confirm:
+    post:
+      tags: [Orders]
+      summary: Подтвердить заказ
+      operationId: confirmOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order/copy/{orderId}:
+    post:
+      tags: [Orders]
+      summary: Скопировать заказ
+      operationId: copyOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orderId:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /product/tips:
+    get:
+      tags: [Search]
+      summary: Подсказки по артикулу
+      operationId: getProductTips
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/ProductTip'
+                  - type: object
+                    properties:
+                      tips:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ProductTip'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /product/search/{productId}:
+    get:
+      tags: [Search]
+      summary: Предложения / наличие по продукту
+      operationId: searchProductOffers
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: orderId
+          in: query
+          schema:
+            type: integer
+        - name: userId
+          in: query
+          deprecated: true
+          description: Не передавать с клиента; брать из сессии
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/ProductOffer'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ProductOffer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  parameters:
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      description: |
+        Internal id. Публичный номер в UI = orderId - 40777.
+        Сервер обязан проверить принадлежность заказа ПВ текущего менеджера.
+      schema:
+        type: integer
+    From:
+      name: from
+      in: query
+      schema:
+        type: string
+        format: date
+    To:
+      name: to
+      in: query
+      schema:
+        type: string
+        format: date
+
+  responses:
+    Unauthorized:
+      description: Нет сессии
+    Forbidden:
+      description: Заказ / ресурс не принадлежит ПВ менеджера
+    NotFound:
+      description: Не найдено
+    BadRequest:
+      description: Ошибка валидации
+
+  schemas:
+    FranchiseUser:
+      type: object
+      required: [id, roles, manager]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+          example: [franchising]
+        manager:
+          type: object
+          required: [branchId]
+          properties:
+            branchId:
+              type: integer
+            branchName:
+              type: string
+
+    OrderStatus:
+      type: string
+      enum:
+        - accepted
+        - collected
+        - packed
+        - confirmed
+        - notified_customer
+        - issued
+        - canceled
+
+    OrderListItem:
+      type: object
+      required: [id, status]
+      properties:
+        id: { type: integer }
+        number:
+          oneOf:
+            - { type: integer }
+            - { type: string }
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        createdAt: { type: string }
+        customerName: { type: string }
+        phone: { type: string }
+        car: { type: string }
+        totalPrice: { type: number }
+        branchId: { type: integer }
+
+    Order:
+      allOf:
+        - $ref: '#/components/schemas/OrderListItem'
+        - type: object
+          properties:
+            firstName: { type: string }
+            lastName: { type: string }
+            fatherName: { type: string }
+            email: { type: string }
+            carBrand: { type: string }
+            carModel: { type: string }
+            carVin: { type: string }
+            comment: { type: string }
+
+    OrderElement:
+      type: object
+      required: [id]
+      properties:
+        id: { type: integer }
+        article: { type: string }
+        brand: { type: string }
+        name: { type: string }
+        quantity: { type: number }
+        price: { type: number }
+        status: { type: string }
+        weight: { type: number }
+        description: { type: string }
+
+    CreateFranchisingOrderRequest:
+      type: object
+      required: [firstName, phone]
+      properties:
+        firstName: { type: string }
+        lastName: { type: string }
+        fatherName: { type: string }
+        phone: { type: string }
+        email: { type: string }
+        carBrand: { type: string }
+        carModel: { type: string }
+        carVin: { type: string }
+        warehouseId:
+          type: string
+          enum: ['2', '29']
+          description: 2 = Владивосток, 29 = ответхранение (согласовать с бэком)
+        branchId:
+          type: integer
+          deprecated: true
+          description: Не принимать от клиента — только из сессии
+        userId:
+          type: integer
+          deprecated: true
+          description: Не принимать от клиента — только из сессии
+
+    ProductTip:
+      type: object
+      required: [id, article]
+      properties:
+        id: { type: integer }
+        article: { type: string }
+        brand: { type: string }
+        name: { type: string }
+
+    ProductOffer:
+      type: object
+      required: [id, article]
+      properties:
+        id: { type: integer }
+        article: { type: string }
+        brand: { type: string }
+        name: { type: string }
+        price: { type: number }
+        quantity: { type: number }
+        deliveryDays: { type: number }
+        warehouseName: { type: string }
