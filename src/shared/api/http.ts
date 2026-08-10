@@ -9,12 +9,20 @@ export const http = axios.create({
   },
 })
 
+type UnauthorizedHandler = () => void
+
+let onUnauthorized: UnauthorizedHandler | null = null
+
+/** Подписка на 401 (login-gate). */
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
+  onUnauthorized = handler
+}
+
 http.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Точка расширения: редирект на /login
-      console.warn('[api] unauthorized')
+      onUnauthorized?.()
     }
     return Promise.reject(error)
   },

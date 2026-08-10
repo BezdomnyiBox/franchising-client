@@ -34,6 +34,16 @@ npm run dev
 ```
 
 Dev-прокси: запросы на `/api/*` уходят на `VITE_API_PROXY_TARGET` (см. `vite.config.ts`).
+Cookie с CRM переписываются на localhost (`Domain` снимается, `Secure` снимается) — живая cookie-сессия в `npm run dev`.
+
+### Auth
+
+1. Открыть `/login`, войти логином CRM (form POST → `VITE_LOGIN_PATH`, по умолчанию `/login_check`).
+2. Клиент читает `GET /user/crm_info`; сессия валидна, если есть `permissions.pages`.
+3. Доступ к приложению — роль franchising / менеджер ПВ с `manager.branchId`.
+4. 401 с API → редирект на `/login`.
+
+Если form-login на другом URL — поправьте `VITE_LOGIN_PATH` или задайте `VITE_EXTERNAL_LOGIN_URL`.
 
 ## OpenAPI
 
