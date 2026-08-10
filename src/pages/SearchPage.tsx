@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
+import { addOrderElement } from '@/features/orders/api'
 import { fetchProductOffers, fetchProductTips } from '@/features/search/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -16,9 +18,11 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { publicNumberToOrderId } from '@/shared/config'
+import type { ProductOffer } from '@/entities/product/types'
 
 export function SearchPage() {
   const [params] = useSearchParams()
+  const queryClient = useQueryClient()
   const orderNumber = params.get('orderNumber') ?? ''
   const orderId = orderNumber ? publicNumberToOrderId(orderNumber) : undefined
 
@@ -27,6 +31,7 @@ export function SearchPage() {
   const [selectedProductId, setSelectedProductId] = useState<number | null>(
     params.get('productId') ? Number(params.get('productId')) : null,
   )
+  const [addingItemId, setAddingItemId] = useState<number | null>(null)
 
   useEffect(() => {
     const id = window.setTimeout(() => setDebounced(query.trim()), 300)
@@ -49,6 +54,35 @@ export function SearchPage() {
     enabled: selectedProductId != null,
   })
 
+  const addMutation = useMutation({
+    mutationFn: async (offer: ProductOffer) => {
+      if (!orderId) throw new Error('NO_ORDER')
+      return addOrderElement(orderId, {
+        itemId: offer.id,
+        quantity: 1,
+        searchProductId: selectedProductId,
+      })
+    },
+    onMutate: (offer) => setAddingItemId(offer.id),
+    onSuccess: (result) => {
+      if (result.result === 'failed' || (!result.orderElementId && result.message)) {
+        toast.error(result.message || result.error || 'Не удалось добавить позицию')
+        return
+      }
+      toast.success(`Добавлено в заказ #${orderNumber}`)
+      void queryClient.invalidateQueries({ queryKey: ['order-elements', orderId] })
+      void queryClient.invalidateQueries({ queryKey: ['order', orderId] })
+    },
+    onError: (error) => {
+      if (error instanceof Error && error.message === 'NO_ORDER') {
+        toast.error('Сначала откройте поиск из карточки заказа')
+        return
+      }
+      toast.error('Ошибка при добавлении в заказ')
+    },
+    onSettled: () => setAddingItemId(null),
+  })
+
   return (
     <div className="space-y-6">
       <div>
@@ -63,7 +97,7 @@ export function SearchPage() {
               </Link>
             </>
           ) : (
-            '. Можно открыть из карточки заказа.'
+            '. Откройте поиск из карточки заказа, чтобы добавить позиции.'
           )}
         </p>
       </div>
@@ -128,6 +162,7 @@ export function SearchPage() {
                   <TableHead>Склад / срок</TableHead>
                   <TableHead>Наличие</TableHead>
                   <TableHead className="text-right">Цена</TableHead>
+                  <TableHead className="text-right">Действие</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -136,13 +171,25 @@ export function SearchPage() {
                     <TableCell className="font-mono text-xs">{offer.article}</TableCell>
                     <TableCell>{offer.brand ?? '—'}</TableCell>
                     <TableCell>
-                      {[offer.warehouseName, offer.deliveryDays != null ? `${offer.deliveryDays} дн.` : null]
+                      {[
+                        offer.warehouseName,
+                        offer.deliveryDays != null ? `${offer.deliveryDays} дн.` : null,
+                      ]
                         .filter(Boolean)
                         .join(' · ') || '—'}
                     </TableCell>
                     <TableCell>{offer.quantity ?? '—'}</TableCell>
                     <TableCell className="text-right">
                       {offer.price != null ? `${offer.price} ₽` : '—'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        disabled={!orderId || addingItemId === offer.id || addMutation.isPending}
+                        onClick={() => addMutation.mutate(offer)}
+                      >
+                        {addingItemId === offer.id ? '…' : 'В заказ'}
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

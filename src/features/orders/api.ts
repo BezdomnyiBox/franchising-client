@@ -14,6 +14,22 @@ type LegacyOrdersListResponse = Record<
   }
 >
 
+export interface AddOrderElementPayload {
+  itemId: number
+  quantity?: number
+  searchProductId?: number | null
+  our_products_in_search_result?: unknown[]
+  is_margin?: boolean
+  lineNumber?: number
+}
+
+export interface AddOrderElementResult {
+  orderElementId?: number
+  result?: string
+  message?: string
+  error?: string
+}
+
 function flattenOrdersList(payload: LegacyOrdersListResponse | OrderListItem[]): OrderListItem[] {
   if (Array.isArray(payload)) return payload
   return Object.values(payload).flatMap((group) => group.orders ?? [])
@@ -57,8 +73,19 @@ export async function createFranchisingOrder(
   return data
 }
 
-export async function addOrderElement(orderId: number, itemId: number): Promise<void> {
-  await http.post(`/order/${orderId}/add_element`, { itemId })
+export async function addOrderElement(
+  orderId: number,
+  payload: AddOrderElementPayload,
+): Promise<AddOrderElementResult> {
+  const { data } = await http.post<AddOrderElementResult>(`/order/${orderId}/add_element`, {
+    itemId: payload.itemId,
+    quantity: payload.quantity ?? 1,
+    searchProductId: payload.searchProductId ?? null,
+    our_products_in_search_result: payload.our_products_in_search_result ?? [],
+    is_margin: payload.is_margin ?? false,
+    lineNumber: payload.lineNumber ?? 0,
+  })
+  return data
 }
 
 export async function confirmOrder(orderId: number): Promise<void> {
