@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Franchising Client API
-  version: 0.1.0
+  version: 0.2.0
   description: |
     API для менеджера франшизы (ПВ). Логика совпадает с CRM franchising,
     но доступ ограничен своим пунктом выдачи и своими заказами.
@@ -9,11 +9,20 @@ info:
     Контракт зафиксирован для согласования с бэкендом.
     Часть путей уже существует в CRM; поля scope/enforce — требования к hardening.
 
-    Auth: cookie-сессия (как CRM) на первом этапе.
-    Обязательные серверные ограничения:
-      - user.role включает franchising (или эквивалент)
-      - все выборки заказов фильтруются по manager.branchId
-      - запрет доступа к чужим orderId / branchId (403)
+    ## Auth
+    Cookie-сессия (как CRM). Frontend ходит через `/api` proxy.
+    Логин: Symfony form (`/login_check`, `_username` / `_password`) — путь уточнить у бэка.
+    `GET /user/crm_info` без сессии может вернуть 200 без `permissions.pages`
+    (так сейчас ведёт себя CRM) — клиент считает это «не авторизован».
+
+    ## Enforce ПВ (обязательно на сервере)
+    1. Пользователь с ролью franchising (или эквивалент) и `manager.branchId`.
+    2. `GET /order/list` — всегда фильтр по session.branchId; `selectedBranch` от клиента игнорировать.
+    3. `POST /order/create_by_franchising` — `branchId`/`userId` только из сессии.
+    4. Любой `/order/{orderId}*` — если order.branchId ≠ session.branchId → 403
+       (не 404, чтобы фронт отличал «чужой» от «нет»).
+    5. Поиск/add_element — только в заказ своего ПВ.
+    6. Запретить повышение прав через подмену branchId в теле/query.
 
 servers:
   - url: /api
@@ -26,14 +35,51 @@ tags:
   - name: OrderElements
 
 paths:
+  /login_check:
+    post:
+      tags: [Auth]
+      summary: Form login (Symfony-style, путь уточнить)
+      operationId: loginCheck
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [_username, _password]
+              properties:
+                _username: { type: string }
+                _password: { type: string }
+      responses:
+        '200':
+          description: OK / redirect; Set-Cookie session
+        '302':
+          description: Redirect после логина
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /logout:
+    get:
+      tags: [Auth]
+      summary: Выход (сброс cookie-сессии)
+      operationId: logout
+      responses:
+        '200':
+          description: OK
+        '302':
+          description: Redirect
+
   /user/crm_info:
     get:
       tags: [Auth]
       summary: Текущий пользователь менеджера франшизы
       operationId: getCurrentUser
+      description: |
+        Клиент считает сессию валидной только если есть непустой `permissions.pages`.
+        Для franchising-клиента дополнительно ожидается роль/признак ПВ и manager.branchId.
       responses:
         '200':
-          description: OK
+          description: OK (или «гость» без permissions — legacy CRM)
           content:
             application/json:
               schema:
@@ -188,6 +234,9 @@ paths:
       tags: [OrderElements]
       summary: Добавить позицию в заказ
       operationId: addOrderElement
+      description: |
+        Как в CRM SearchContainer.addItemToOrder.
+        Сервер обязан проверить, что order принадлежит ПВ менеджера.
       parameters:
         - $ref: '#/components/parameters/OrderId'
       requestBody:
@@ -198,11 +247,29 @@ paths:
               type: object
               required: [itemId]
               properties:
-                itemId:
-                  type: integer
+                itemId: { type: integer }
+                quantity: { type: number, default: 1 }
+                searchProductId:
+                  oneOf:
+                    - { type: integer }
+                    - { type: 'null' }
+                our_products_in_search_result:
+                  type: array
+                  items: {}
+                is_margin: { type: boolean, default: false }
+                lineNumber: { type: integer, default: 0 }
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orderElementId: { type: integer }
+                  result: { type: string }
+                  message: { type: string }
+                  error: { type: string }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
