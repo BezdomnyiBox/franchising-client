@@ -9,11 +9,14 @@ info:
     Контракт зафиксирован для согласования с бэкендом.
     Часть путей уже существует в CRM; поля scope/enforce — требования к hardening.
 
-    ## Auth
-    Cookie-сессия (как CRM). Frontend ходит через `/api` proxy.
-    Логин: Symfony form (`/login_check`, `_username` / `_password`) — путь уточнить у бэка.
-    `GET /user/crm_info` без сессии может вернуть 200 без `permissions.pages`
-    (так сейчас ведёт себя CRM) — клиент считает это «не авторизован».
+    ## Auth (отдельно от сайта/CRM)
+    Cookie `franchising_auth` (HttpOnly, HMAC). Не использует `/login_user` и cookie `user`.
+    Логин: `POST /franchising/auth/login` JSON `{ phone, password }`.
+    Только роль `franchising` или manager с `branchId`.
+    `GET /franchising/auth/me` — текущий пользователь.
+    Logout: `POST /franchising/auth/logout`.
+    Для существующих order/search API CRM request-bridge мапит валидный
+    `franchising_auth` → in-memory cookie `user` на время запроса (старая логика не меняется).
 
     ## Enforce ПВ (обязательно на сервере)
     1. Пользователь с ролью franchising (или эквивалент) и `manager.branchId`.
@@ -35,39 +38,63 @@ tags:
   - name: OrderElements
 
 paths:
-  /login_check:
+  /franchising/auth/login:
     post:
       tags: [Auth]
-      summary: Form login (Symfony-style, путь уточнить)
-      operationId: loginCheck
+      summary: Логин менеджера ПВ (отдельный от сайта/CRM)
+      operationId: franchisingLogin
       requestBody:
         required: true
         content:
-          application/x-www-form-urlencoded:
+          application/json:
             schema:
               type: object
-              required: [_username, _password]
+              required: [phone, password]
               properties:
-                _username: { type: string }
-                _password: { type: string }
+                phone:
+                  type: string
+                  description: 10 цифр без +7/8
+                password: { type: string }
       responses:
         '200':
-          description: OK / redirect; Set-Cookie session
-        '302':
-          description: Redirect после логина
+          description: OK + Set-Cookie HttpOnly `franchising_auth`
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result: { type: string, example: success }
+                  authVersion: { type: integer, example: 1 }
+                  cookieName: { type: string, example: franchising_auth }
+                  error: { type: string }
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
-  /logout:
+  /franchising/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Выход (очистка cookie franchising_auth)
+      operationId: franchisingLogout
+      responses:
+        '200':
+          description: OK + Set-Cookie clear
+
+  /franchising/auth/me:
     get:
       tags: [Auth]
-      summary: Выход (сброс cookie-сессии)
-      operationId: logout
+      summary: Текущий менеджер ПВ (franchising auth)
+      operationId: franchisingMe
       responses:
         '200':
           description: OK
-        '302':
-          description: Redirect
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FranchiseUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /user/crm_info:
     get:

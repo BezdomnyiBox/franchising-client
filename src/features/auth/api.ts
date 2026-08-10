@@ -1,38 +1,58 @@
 import { http } from '@/shared/api/http'
+import { clearFranchisingAuthCookie, normalizeLoginPhone } from '@/shared/authCookie'
 import type { FranchiseUser } from '@/entities/user/types'
 
-/** Текущий пользователь CRM / franchising (cookie-сессия). */
+interface FranchisingLoginResponse {
+  result?: string
+  authVersion?: number
+  cookieName?: string
+  error?: string
+}
+
+/** Текущий пользователь: отдельный me, fallback на crm_info. */
 export async function fetchCurrentUser(): Promise<FranchiseUser> {
-  const { data } = await http.get<FranchiseUser>('/user/crm_info')
-  return data
+  try {
+    const { data } = await http.get<FranchiseUser>('/franchising/auth/me')
+    return data
+  } catch {
+    const { data } = await http.get<FranchiseUser>('/user/crm_info')
+    return data
+  }
 }
 
 /**
- * Symfony-style form login через прокси.
- * Путь можно переопределить VITE_LOGIN_PATH (по умолчанию /login_check).
+ * Отдельный login франшизы (не /login_user сайта/CRM).
+ * Set-Cookie: franchising_auth (HttpOnly) через Vite proxy.
  */
-export async function loginWithPassword(username: string, password: string): Promise<void> {
-  const path = import.meta.env.VITE_LOGIN_PATH || '/login_check'
-  const body = new URLSearchParams()
-  body.set('_username', username)
-  body.set('_password', password)
+export async function loginWithPassword(phone: string, password: string): Promise<void> {
+  const path = import.meta.env.VITE_LOGIN_PATH || '/franchising/auth/login'
+  const { data, status } = await http.post<FranchisingLoginResponse>(
+    path,
+    {
+      phone: normalizeLoginPhone(phone),
+      password,
+    },
+    {
+      headers: { 'Content-Type': 'application/json' },
+      validateStatus: (s) => s < 500,
+    },
+  )
 
-  await http.post(path, body, {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    // Symfony часто отвечает редиректом/HTML — нас интересует Set-Cookie
-    maxRedirects: 0,
-    validateStatus: (status) => status >= 200 && status < 400,
-  })
+  if (status === 403) {
+    throw new Error('NOT_FRANCHISING_MANAGER')
+  }
+  if (status >= 400 || data.result === 'failed') {
+    throw new Error(data.error || 'LOGIN_FAILED')
+  }
 }
 
 export async function logout(): Promise<void> {
-  const path = import.meta.env.VITE_LOGOUT_PATH || '/logout'
   try {
-    await http.get(path, {
-      maxRedirects: 0,
-      validateStatus: (status) => status >= 200 && status < 400,
+    await http.post('/franchising/auth/logout', null, {
+      validateStatus: (s) => s >= 200 && s < 500,
     })
   } catch {
-    // ignore — сессию сбросим локально в любом случае
+    // ignore
   }
+  clearFranchisingAuthCookie()
 }

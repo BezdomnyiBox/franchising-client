@@ -38,12 +38,16 @@ Cookie с CRM переписываются на localhost (`Domain` снимае
 
 ### Auth
 
-1. Открыть `/login`, войти логином CRM (form POST → `VITE_LOGIN_PATH`, по умолчанию `/login_check`).
-2. Клиент читает `GET /user/crm_info`; сессия валидна, если есть `permissions.pages`.
-3. Доступ к приложению — роль franchising / менеджер ПВ с `manager.branchId`.
-4. 401 с API → редирект на `/login`.
+Отдельная авторизация франшизы (не трогает `/login_user` и cookie `user` сайта/CRM):
 
-Если form-login на другом URL — поправьте `VITE_LOGIN_PATH` или задайте `VITE_EXTERNAL_LOGIN_URL`.
+1. Открыть `/login`, войти телефоном и паролем.
+2. `POST /franchising/auth/login` → `Set-Cookie: franchising_auth=v1.{apiUserId}.{exp}.{hmac}` (HttpOnly).
+3. Доступ только роли `franchising` или manager с `branchId`.
+4. `GET /franchising/auth/me` (или `GET /user/crm_info` через request-bridge).
+5. Выход — `POST /franchising/auth/logout`.
+6. 401 с API → редирект на `/login`.
+
+Опционально: `VITE_EXTERNAL_LOGIN_URL` — ссылка на вход на главной сайта.
 
 ## OpenAPI
 

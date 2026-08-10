@@ -7,13 +7,17 @@ import { Store } from 'lucide-react'
 import { toast } from 'sonner'
 import { loginWithPassword } from '@/features/auth/api'
 import { useAuth } from '@/features/auth/AuthContext'
+import { normalizeLoginPhone } from '@/shared/authCookie'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 const schema = z.object({
-  username: z.string().min(1, 'Укажите логин'),
+  phone: z
+    .string()
+    .min(1, 'Укажите телефон')
+    .refine((v) => normalizeLoginPhone(v).length === 10, 'Нужен номер из 10 цифр'),
   password: z.string().min(1, 'Укажите пароль'),
 })
 
@@ -30,7 +34,7 @@ export function LoginPage() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { username: '', password: '' },
+    defaultValues: { phone: '', password: '' },
   })
 
   if (!isLoading && isAuthenticated && isFranchiseManager) {
@@ -40,16 +44,20 @@ export function LoginPage() {
   const onSubmit = form.handleSubmit(async (values) => {
     setSubmitting(true)
     try {
-      await loginWithPassword(values.username, values.password)
+      await loginWithPassword(values.phone, values.password)
       const user = await refresh()
       if (!user?.permissions?.pages) {
-        toast.error('Не удалось войти. Проверьте логин/пароль или путь VITE_LOGIN_PATH.')
+        toast.error('Не удалось войти. Проверьте телефон и пароль.')
         return
       }
       toast.success('Вход выполнен')
       navigate(from, { replace: true })
-    } catch {
-      toast.error('Ошибка входа. Если форма на другом URL — задайте VITE_LOGIN_PATH или войдите через CRM.')
+    } catch (error) {
+      if (error instanceof Error && error.message === 'NOT_FRANCHISING_MANAGER') {
+        toast.error('Нет доступа менеджера ПВ (роль franchising / branchId).')
+      } else {
+        toast.error('Ошибка входа. Проверьте телефон и пароль.')
+      }
     } finally {
       setSubmitting(false)
     }
@@ -70,14 +78,25 @@ export function LoginPage() {
           </div>
           <CardTitle className="text-xl">Вход менеджера ПВ</CardTitle>
           <CardDescription>
-            Cookie-сессия CRM через Vite-прокси (`/api`). Логин тот же, что для CRM.
+            Отдельный вход франшизы: `POST /franchising/auth/login`, HttpOnly cookie
+            `franchising_auth` (через Vite-прокси `/api`).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <form className="space-y-3" onSubmit={onSubmit}>
             <div className="space-y-1.5">
-              <Label htmlFor="username">Логин</Label>
-              <Input id="username" autoComplete="username" {...form.register('username')} />
+              <Label htmlFor="phone">Телефон</Label>
+              <Input
+                id="phone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="username"
+                placeholder="9123456789"
+                {...form.register('phone')}
+              />
+              {form.formState.errors.phone ? (
+                <p className="text-xs text-destructive">{form.formState.errors.phone.message}</p>
+              ) : null}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Пароль</Label>
@@ -103,8 +122,8 @@ export function LoginPage() {
             </p>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Если endpoint логина другой — укажите `VITE_LOGIN_PATH` в `.env`. Для cookie с
-              `*.public.lan` прокси переписывает Domain на localhost.
+              Не использует `/login_user` и cookie `user` сайта/CRM. Прокси снимает Domain у
+              `franchising_auth`, чтобы cookie жила на localhost.
             </p>
           )}
         </CardContent>
