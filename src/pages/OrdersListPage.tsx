@@ -3,7 +3,13 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { fetchOrdersList } from '@/features/orders/api'
-import { orderStatusLabel, orderStatusVariant } from '@/features/orders/status'
+import {
+  formatOrderListPrice,
+  formatRubles,
+  orderListStageLabel,
+  orderStatusLabel,
+  orderStatusVariant,
+} from '@/features/orders/status'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -42,7 +48,19 @@ export function OrdersListPage() {
       }),
   })
 
-  const orders = useMemo(() => query.data ?? [], [query.data])
+  const groups = useMemo(() => query.data ?? [], [query.data])
+
+  const totals = useMemo(() => {
+    return groups.reduce(
+      (acc, group) => {
+        acc.orders += group.orders.length
+        acc.amount += group.amount || 0
+        acc.takeMoney += group.takeMoney || 0
+        return acc
+      },
+      { orders: 0, amount: 0, takeMoney: 0 },
+    )
+  }, [groups])
 
   return (
     <div className="space-y-6">
@@ -50,7 +68,7 @@ export function OrdersListPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Заказы ПВ</h1>
           <p className="text-sm text-muted-foreground">
-            Только заказы вашего пункта выдачи. Фильтры применяются по кнопке «Найти».
+            Группы по стадиям сделки, как отдаёт API. Фильтры — по кнопке «Найти».
           </p>
         </div>
         <Button asChild>
@@ -100,62 +118,121 @@ export function OrdersListPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="pt-6">
-          {query.isLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : query.isError ? (
+      {query.isLoading ? (
+        <Card>
+          <CardContent className="space-y-2 pt-6">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+      ) : query.isError ? (
+        <Card>
+          <CardContent className="pt-6">
             <p className="text-sm text-destructive">
               Не удалось загрузить список. Проверьте авторизацию и API.
             </p>
-          ) : orders.length === 0 ? (
+          </CardContent>
+        </Card>
+      ) : groups.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Заказов не найдено.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>№</TableHead>
-                  <TableHead>Статус</TableHead>
-                  <TableHead>Клиент</TableHead>
-                  <TableHead>Телефон</TableHead>
-                  <TableHead className="text-right">Сумма</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orders.map((order) => {
-                  const publicNumber = order.number ?? orderIdToPublicNumber(order.id)
-                  return (
-                    <TableRow key={order.id}>
-                      <TableCell>
-                        <Link
-                          className="font-medium underline-offset-4 hover:underline"
-                          to={`/orders/${publicNumber}`}
-                        >
-                          {publicNumber}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={orderStatusVariant(order.status)}>
-                          {orderStatusLabel(order.status)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{order.customerName ?? '—'}</TableCell>
-                      <TableCell>{order.phone ?? '—'}</TableCell>
-                      <TableCell className="text-right">
-                        {order.totalPrice != null ? `${order.totalPrice} ₽` : '—'}
-                      </TableCell>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {groups.map((group) => (
+            <Card key={group.key}>
+              <CardHeader className="pb-3">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Стадия сделки</p>
+                    <CardTitle className="text-lg">
+                      {group.description || orderListStageLabel(group.status)}
+                    </CardTitle>
+                  </div>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Количество: </span>
+                      <span className="font-medium">{group.orders.length}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Сумма: </span>
+                      <span className="font-medium">{formatRubles(group.amount)}</span>
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Дата</TableHead>
+                      <TableHead>№</TableHead>
+                      <TableHead>Статус</TableHead>
+                      <TableHead>Клиент</TableHead>
+                      <TableHead>Телефон</TableHead>
+                      <TableHead>Авто</TableHead>
+                      <TableHead className="text-right">Сумма</TableHead>
                     </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {group.orders.map((order) => {
+                      const publicNumber = order.number ?? orderIdToPublicNumber(order.id)
+                      return (
+                        <TableRow key={order.id}>
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {order.createdAt ?? '—'}
+                          </TableCell>
+                          <TableCell>
+                            <Link
+                              className="font-medium underline-offset-4 hover:underline"
+                              to={`/orders/${publicNumber}`}
+                            >
+                              {publicNumber}
+                            </Link>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={orderStatusVariant(order.status)}>
+                              {order.statusDescription ?? orderStatusLabel(order.status)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{order.customerFullName || '—'}</TableCell>
+                          <TableCell>{order.phone || '—'}</TableCell>
+                          <TableCell className="max-w-[12rem] truncate">
+                            {order.fullCar || '—'}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatOrderListPrice(order.price)}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          ))}
+
+          <Card>
+            <CardContent className="flex flex-wrap gap-6 pt-6 text-sm">
+              <div>
+                <span className="text-muted-foreground">Всего заказов: </span>
+                <span className="font-medium">{totals.orders}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Сумма всех сделок: </span>
+                <span className="font-medium">{formatRubles(totals.amount)}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Сумма оплаченных: </span>
+                <span className="font-medium">{formatRubles(totals.takeMoney)}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   )
 }

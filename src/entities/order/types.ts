@@ -8,16 +8,41 @@ export type OrderStatus =
   | 'canceled'
   | string
 
+/** Элемент из GET /order/list (поля как в OrderObject::getOrdersList). */
 export interface OrderListItem {
   id: number
   number?: number | string
   status: OrderStatus
+  statusDescription?: string
   createdAt?: string
-  customerName?: string
+  createdDate?: string
+  /** ФИО клиента (бэкенд: customerFullName). */
+  customerFullName?: string
   phone?: string
-  car?: string
-  totalPrice?: number
+  /** Автомобиль (бэкенд: fullCar). */
+  fullCar?: string
+  /** Сумма в копейках (бэкенд: price = getPriceAmount()). */
+  price?: number
+  remainingPaymentAmount?: number
+  workManagerName?: string
+  address?: string
   branchId?: number
+}
+
+/**
+ * Группа списка заказов.
+ * Бэкенд отдаёт Record<"1"|"2"|…, OrdersListGroup>, ключи = порядок стадий (ksort).
+ */
+export interface OrdersListGroup {
+  key: string
+  status: OrderStatus
+  description: string
+  orders: OrderListItem[]
+  /** Сумма группы в рублях. */
+  amount: number
+  takeMoney: number
+  lostMoney: number
+  marginAmount: number
 }
 
 export interface Order {

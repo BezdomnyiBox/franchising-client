@@ -5,12 +5,20 @@ import type {
   OrderElement,
   OrderListItem,
   OrdersListFilters,
+  OrdersListGroup,
 } from '@/entities/order/types'
 
+/** Ответ GET /order/list: объект, ключи — числовой порядок стадий (1…7). */
 type LegacyOrdersListResponse = Record<
   string,
   {
+    status: string
+    description: string
     orders: OrderListItem[]
+    lostMoney?: number
+    takeMoney?: number
+    amount?: number
+    marginAmount?: number
   }
 >
 
@@ -30,19 +38,57 @@ export interface AddOrderElementResult {
   error?: string
 }
 
-function flattenOrdersList(payload: LegacyOrdersListResponse | OrderListItem[]): OrderListItem[] {
-  if (Array.isArray(payload)) return payload
-  return Object.values(payload).flatMap((group) => group.orders ?? [])
+/**
+ * Сохраняет группировку бэкенда (OrderObject::getOrdersList + ksort).
+ * Порядок групп — по числовым ключам ответа.
+ */
+function parseOrdersListGroups(
+  payload: LegacyOrdersListResponse | OrderListItem[],
+): OrdersListGroup[] {
+  if (Array.isArray(payload)) {
+    if (payload.length === 0) return []
+    return [
+      {
+        key: 'all',
+        status: '',
+        description: 'Заказы',
+        orders: payload,
+        amount: 0,
+        takeMoney: 0,
+        lostMoney: 0,
+        marginAmount: 0,
+      },
+    ]
+  }
+
+  return Object.keys(payload)
+    .sort((a, b) => Number(a) - Number(b))
+    .map((key) => {
+      const block = payload[key]
+      return {
+        key,
+        status: block.status ?? '',
+        description: block.description || block.status || `Стадия ${key}`,
+        orders: block.orders ?? [],
+        amount: block.amount ?? 0,
+        takeMoney: block.takeMoney ?? 0,
+        lostMoney: block.lostMoney ?? 0,
+        marginAmount: block.marginAmount ?? 0,
+      }
+    })
+    .filter((group) => group.orders.length > 0)
 }
 
-export async function fetchOrdersList(filters: OrdersListFilters = {}): Promise<OrderListItem[]> {
+export async function fetchOrdersList(
+  filters: OrdersListFilters = {},
+): Promise<OrdersListGroup[]> {
   const { data } = await http.get<LegacyOrdersListResponse | OrderListItem[]>('/order/list', {
     params: {
       withoutInnerOrders: 1,
       ...filters,
     },
   })
-  return flattenOrdersList(data)
+  return parseOrdersListGroups(data)
 }
 
 export async function fetchOrder(orderId: number): Promise<Order> {
