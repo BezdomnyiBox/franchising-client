@@ -149,7 +149,7 @@ export async function fetchOrderElements(orderId: number): Promise<OrderElement[
 
 export async function createFranchisingOrder(
   payload: CreateFranchisingOrderPayload,
-): Promise<{ orderId: number }> {
+): Promise<{ id: number; orderId: number }> {
   const body = new URLSearchParams()
   Object.entries(payload).forEach(([key, value]) => {
     if (value !== undefined && value !== '') {
@@ -157,10 +157,17 @@ export async function createFranchisingOrder(
     }
   })
 
-  const { data } = await http.post<{ orderId: number }>('/order/create_by_franchising', body, {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  })
-  return data
+  const { data } = await http.post<{ id?: number; orderId?: number; result?: string; message?: string }>(
+    '/order/create_by_franchising',
+    body,
+    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
+  )
+
+  if (!data?.orderId) {
+    throw new Error(data?.message || 'Не удалось создать заказ')
+  }
+
+  return { id: data.id ?? 0, orderId: data.orderId }
 }
 
 export async function addOrderElement(

@@ -536,18 +536,9 @@ components:
         carBrand: { type: string }
         carModel: { type: string }
         carVin: { type: string }
-        warehouseId:
-          type: string
-          enum: ['2', '29']
-          description: 2 = Владивосток, 29 = ответхранение (согласовать с бэком)
-        branchId:
-          type: integer
-          deprecated: true
-          description: Не принимать от клиента — только из сессии
-        userId:
-          type: integer
-          deprecated: true
-          description: Не принимать от клиента — только из сессии
+      description: |
+        ПВ (branch) берётся из менеджера сессии на бэкенде.
+        Поле warehouseId/branchId с клиента не требуется.
 
     ProductTip:
       type: object

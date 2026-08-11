@@ -156,8 +156,6 @@ export interface CreateFranchisingOrderPayload {
   carBrand?: string
   carModel?: string
   carVin?: string
-  /** Склад назначения (Владивосток / ответхранение) — на стороне API. */
-  warehouseId?: string
 }
 
 export interface OrdersListFilters {

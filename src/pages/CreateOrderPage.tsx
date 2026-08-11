@@ -4,11 +4,11 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { createFranchisingOrder } from '@/features/orders/api'
+import { useAuth } from '@/features/auth/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { orderIdToPublicNumber } from '@/shared/config'
 
 const schema = z.object({
   firstName: z
@@ -25,13 +25,13 @@ const schema = z.object({
   carBrand: z.string().optional(),
   carModel: z.string().optional(),
   carVin: z.string().optional(),
-  warehouseId: z.enum(['2', '29']),
 })
 
 type FormValues = z.infer<typeof schema>
 
 export function CreateOrderPage() {
   const navigate = useNavigate()
+  const { branchId, branchName } = useAuth()
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -43,24 +43,33 @@ export function CreateOrderPage() {
       carBrand: '',
       carModel: '',
       carVin: '',
-      warehouseId: '2',
     },
   })
 
   const mutation = useMutation({
     mutationFn: createFranchisingOrder,
     onSuccess: (data) => {
-      const publicNumber = orderIdToPublicNumber(data.orderId)
-      navigate(`/orders/${publicNumber}`)
+      // API отдаёт orderId = публичный номер (getNumber), не internal id
+      navigate(`/orders/${data.orderId}`)
     },
   })
+
+  const errorMessage =
+    mutation.error instanceof Error
+      ? mutation.error.message
+      : mutation.isError
+        ? 'Не удалось создать заказ. Проверьте сессию и права ПВ.'
+        : null
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Новый заказ</h1>
         <p className="text-sm text-muted-foreground">
-          Создание заказа от имени менеджера франшизы. ПВ берётся из сессии на бэкенде.
+          Создание заказа от имени менеджера франшизы. Пункт выдачи:{' '}
+          <span className="font-medium text-foreground">
+            {branchName || (branchId ? `ПВ #${branchId}` : 'из сессии')}
+          </span>
         </p>
       </div>
 
@@ -111,28 +120,20 @@ export function CreateOrderPage() {
               <Label htmlFor="carVin">VIN / кузов</Label>
               <Input id="carVin" {...form.register('carVin')} />
             </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="warehouseId">Склад</Label>
-              <select
-                id="warehouseId"
-                className="border-input bg-background h-9 w-full rounded-lg border px-3 text-sm"
-                {...form.register('warehouseId')}
-              >
-                <option value="2">Владивосток</option>
-                <option value="29">Ответственное хранение</option>
-              </select>
-            </div>
 
-            {mutation.isError ? (
-              <p className="text-sm text-destructive sm:col-span-2">
-                Не удалось создать заказ. Проверьте сессию и права ПВ.
-              </p>
+            {errorMessage ? (
+              <p className="text-sm text-destructive sm:col-span-2">{errorMessage}</p>
             ) : null}
 
             <div className="sm:col-span-2">
-              <Button type="submit" disabled={mutation.isPending}>
+              <Button type="submit" disabled={mutation.isPending || !branchId}>
                 {mutation.isPending ? 'Создание…' : 'Создать заказ'}
               </Button>
+              {!branchId ? (
+                <p className="mt-2 text-xs text-destructive">
+                  В сессии нет ПВ менеджера — создание недоступно.
+                </p>
+              ) : null}
             </div>
           </form>
         </CardContent>
