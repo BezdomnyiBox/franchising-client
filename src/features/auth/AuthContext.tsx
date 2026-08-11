@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useState,
   type ReactNode,
 } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -28,25 +29,42 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
+  /**
+   * После logout отключаем /me: на public.lan бэкенд может отвечать
+   * по cookie сайта (user), и refetch снова «впускает» в приложение.
+   * Включаем снова только после явного login → refresh().
+   */
+  const [sessionEnabled, setSessionEnabled] = useState(true)
 
   const userQuery = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: fetchCurrentUser,
+    enabled: sessionEnabled,
     retry: false,
     staleTime: 60_000,
   })
 
-  const user = userQuery.data ?? null
+  const user = sessionEnabled ? (userQuery.data ?? null) : null
   const authenticated = hasCrmSession(user)
   const franchise = isFranchiseManager(user)
 
   const refresh = useCallback(async () => {
-    const result = await userQuery.refetch()
-    return result.data ?? null
-  }, [userQuery])
+    setSessionEnabled(true)
+    try {
+      const data = await queryClient.fetchQuery({
+        queryKey: ['auth', 'me'],
+        queryFn: fetchCurrentUser,
+      })
+      return data ?? null
+    } catch {
+      queryClient.setQueryData(['auth', 'me'], null)
+      return null
+    }
+  }, [queryClient])
 
   const logout = useCallback(async () => {
     await apiLogout()
+    setSessionEnabled(false)
     queryClient.setQueryData(['auth', 'me'], null)
     queryClient.removeQueries({ queryKey: ['auth', 'me'] })
   }, [queryClient])
@@ -54,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
-      isLoading: userQuery.isLoading,
+      isLoading: sessionEnabled && userQuery.isLoading,
       isAuthenticated: authenticated,
       isFranchiseManager: franchise,
       branchId: user?.manager?.branchId,
@@ -62,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refresh,
       logout,
     }),
-    [user, userQuery.isLoading, authenticated, franchise, refresh, logout],
+    [user, sessionEnabled, userQuery.isLoading, authenticated, franchise, refresh, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
