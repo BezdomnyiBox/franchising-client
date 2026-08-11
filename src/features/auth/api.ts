@@ -1,3 +1,4 @@
+import axios from 'axios'
 import { http } from '@/shared/api/http'
 import { clearFranchisingAuthCookie, normalizeLoginPhone } from '@/shared/authCookie'
 import type { FranchiseUser } from '@/entities/user/types'
@@ -9,12 +10,27 @@ interface FranchisingLoginResponse {
   error?: string
 }
 
-/** Текущий пользователь: отдельный me, fallback на crm_info. */
+function statusOf(error: unknown): number | undefined {
+  return axios.isAxiosError(error) ? error.response?.status : undefined
+}
+
+/**
+ * Текущий пользователь по cookie franchising_auth.
+ * Fallback на /user/crm_info только если /me ещё не задеплоен (404),
+ * не при 401 — иначе на public.lan/podzamenu.ru «выход» подхватывает cookie сайта.
+ */
 export async function fetchCurrentUser(): Promise<FranchiseUser> {
   try {
     const { data } = await http.get<FranchiseUser>('/franchising/auth/me')
     return data
-  } catch {
+  } catch (error) {
+    const status = statusOf(error)
+    if (status === 401 || status === 403) {
+      throw error
+    }
+    if (status !== 404) {
+      throw error
+    }
     const { data } = await http.get<FranchiseUser>('/user/crm_info')
     return data
   }

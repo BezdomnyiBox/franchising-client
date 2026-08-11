@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     await apiLogout()
     queryClient.setQueryData(['auth', 'me'], null)
-    await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] })
+    queryClient.removeQueries({ queryKey: ['auth', 'me'] })
   }, [queryClient])
 
   const value = useMemo<AuthContextValue>(

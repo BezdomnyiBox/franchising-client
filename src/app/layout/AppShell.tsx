@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { ClipboardList, LogOut, PackagePlus, Search, Store } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/features/auth/AuthContext'
@@ -12,6 +12,12 @@ const nav = [
 
 export function AppShell() {
   const { user, branchId, branchName, logout } = useAuth()
+  const navigate = useNavigate()
+
+  const onLogout = async () => {
+    await logout()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div className="min-h-svh bg-background text-foreground">
@@ -52,7 +58,7 @@ export function AppShell() {
                 ПВ {branchName || branchId || '—'}
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={() => void logout()}>
+            <Button variant="outline" size="sm" onClick={() => void onLogout()}>
               <LogOut className="size-4" />
               Выйти
             </Button>
