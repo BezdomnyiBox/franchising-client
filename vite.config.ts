@@ -19,8 +19,11 @@ function rewriteCookies(setCookie: string[] | undefined): string[] | undefined {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, rootDir, '')
   const proxyTarget = env.VITE_API_PROXY_TARGET || 'http://crm.public.lan'
+  const appBase = (env.VITE_APP_BASE_PATH || '/crm_fr').replace(/\/$/, '')
+  const apiPrefix = `${appBase}/api`
 
   return {
+    base: `${appBase}/`,
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
@@ -28,13 +31,16 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      host: true,
       port: 5173,
+      allowedHosts: ['public.lan', 'localhost', '.public.lan'],
       proxy: {
-        '/api': {
+        // Как prod: /crm_fr/api/* → backend/* (same-origin cookie-сессия)
+        [apiPrefix]: {
           target: proxyTarget,
           changeOrigin: true,
           secure: false,
-          rewrite: (p) => p.replace(/^\/api/, ''),
+          rewrite: (p) => p.replace(new RegExp(`^${apiPrefix}`), ''),
           cookieDomainRewrite: '',
           cookiePathRewrite: '/',
           configure: (proxy) => {

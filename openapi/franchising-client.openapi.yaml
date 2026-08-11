@@ -28,8 +28,8 @@ info:
     6. Запретить повышение прав через подмену branchId в теле/query.
 
 servers:
-  - url: /api
-    description: Vite proxy / gateway
+  - url: /crm_fr/api
+    description: Same-origin gateway (Vite / Apache / Nginx → backend)
 
 tags:
   - name: Auth

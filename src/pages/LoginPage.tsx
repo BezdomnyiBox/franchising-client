@@ -76,10 +76,8 @@ export function LoginPage() {
               <div className="text-xs font-medium text-muted-foreground">Franchising · ПВ</div>
             </div>
           </div>
-          <CardTitle className="text-xl">Вход менеджера ПВ</CardTitle>
+          <CardTitle className="text-xl">Вход в систему</CardTitle>
           <CardDescription>
-            Отдельный вход франшизы: `POST /franchising/auth/login`, HttpOnly cookie
-            `franchising_auth` (через Vite-прокси `/api`).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -122,8 +120,6 @@ export function LoginPage() {
             </p>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Не использует `/login_user` и cookie `user` сайта/CRM. Прокси снимает Domain у
-              `franchising_auth`, чтобы cookie жила на localhost.
             </p>
           )}
         </CardContent>

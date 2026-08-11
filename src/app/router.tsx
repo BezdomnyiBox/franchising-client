@@ -7,10 +7,11 @@ import { LoginPage } from '@/pages/LoginPage'
 import { OrderDetailPage } from '@/pages/OrderDetailPage'
 import { OrdersListPage } from '@/pages/OrdersListPage'
 import { SearchPage } from '@/pages/SearchPage'
+import { APP_BASE_PATH } from '@/shared/config'
 
 export function AppRouter() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={APP_BASE_PATH}>
       <AuthSessionBridge />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
