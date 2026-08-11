@@ -143,6 +143,7 @@ export interface OrderElement {
   retailPrice?: number
   offerPrice?: number
   weight?: number
+  itemId?: number | null
   item?: OrderElementItem | null
   [key: string]: unknown
 }

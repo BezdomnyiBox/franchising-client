@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
@@ -20,20 +20,13 @@ import {
   fetchOrderStatus,
 } from '@/features/orders/api'
 import { CustomerEditForm } from '@/features/orders/CustomerEditForm'
-import { formatRubles, orderStatusLabel, orderStatusVariant } from '@/features/orders/status'
-import type { OrderElement } from '@/entities/order/types'
+import { OrderElementsTable } from '@/features/orders/OrderElementsTable'
+import { orderStatusLabel, orderStatusVariant, formatRubles } from '@/features/orders/status'
+import { useAuth } from '@/features/auth/AuthContext'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { publicNumberToOrderId } from '@/shared/config'
 import { formatPhoneRu, toTelHref } from '@/shared/phone'
 import { cn } from '@/lib/utils'
@@ -56,12 +49,6 @@ function formatAssemblyTime(value?: string | null): string {
   }
 }
 
-/** retailPrice / offerPrice в копейках. */
-function formatKopecks(value?: number | null): string {
-  if (value == null || Number.isNaN(Number(value))) return '—'
-  return formatRubles(Number(value) / 100)
-}
-
 function paymentLabel(paymentAmount?: number | null, paymentsCount?: number): string {
   if (paymentAmount == null) {
     return paymentsCount ? 'Оплачен' : 'Не оплачен'
@@ -71,18 +58,6 @@ function paymentLabel(paymentAmount?: number | null, paymentsCount?: number): st
   }
   if (paymentAmount > 0) return `Доплата: ${formatRubles(paymentAmount)}`
   return `На возврат: ${formatRubles(Math.abs(paymentAmount))}`
-}
-
-function elementBrand(el: OrderElement): string {
-  return el.item?.product?.brand?.name || '—'
-}
-
-function elementArticle(el: OrderElement): string {
-  return el.item?.product?.articleSearch || el.item?.product?.article || el.oem || '—'
-}
-
-function elementName(el: OrderElement): string {
-  return el.description || el.item?.product?.name || '—'
 }
 
 function DataRow({
@@ -106,7 +81,9 @@ export function OrderDetailPage() {
   const { publicNumber = '' } = useParams()
   const orderId = publicNumberToOrderId(publicNumber)
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   const [editingCustomer, setEditingCustomer] = useState(false)
+  const [openSearchToken, setOpenSearchToken] = useState(0)
 
   const enabled = Number.isFinite(orderId)
 
@@ -149,24 +126,6 @@ export function OrderDetailPage() {
   const statusData = statusQuery.data
   const payments = paymentsQuery.data
   const elements = elementsQuery.data ?? []
-
-  const activeElements = useMemo(
-    () => elements.filter((el) => el.status !== 'canceled'),
-    [elements],
-  )
-
-  const totals = useMemo(() => {
-    return activeElements.reduce(
-      (acc, el) => {
-        const qty = el.quantity ?? 0
-        const price = el.retailPrice ?? 0
-        acc.qty += qty
-        acc.sum += (price * qty) / 100
-        return acc
-      },
-      { qty: 0, sum: 0 },
-    )
-  }, [activeElements])
 
   if (!enabled) {
     return <p className="text-sm text-destructive">Некорректный номер заказа.</p>
@@ -213,6 +172,11 @@ export function OrderDetailPage() {
   const payAmount = payments?.paymentAmount
   const payCount = payments?.payments?.length ?? order.paymentsCount ?? 0
 
+  const refreshElements = () => {
+    void queryClient.invalidateQueries({ queryKey: ['order-elements', orderId] })
+    void queryClient.invalidateQueries({ queryKey: ['order', orderId] })
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -242,11 +206,9 @@ export function OrderDetailPage() {
               </a>
             </Button>
           ) : null}
-          <Button asChild>
-            <Link to={`/search?orderNumber=${displayNumber}`}>
-              <Search className="size-4" />
-              Найти товар
-            </Link>
+          <Button type="button" onClick={() => setOpenSearchToken((n) => n + 1)}>
+            <Search className="size-4" />
+            Найти товар
           </Button>
         </div>
       </div>
@@ -391,19 +353,10 @@ export function OrderDetailPage() {
 
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <CardTitle className="text-base">Позиции заказа</CardTitle>
-            <div className="flex gap-4 text-sm">
-              <div>
-                <span className="text-muted-foreground">Кол-во: </span>
-                <span className="font-medium">{totals.qty}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Сумма: </span>
-                <span className="font-medium">{formatRubles(totals.sum)}</span>
-              </div>
-            </div>
-          </div>
+          <CardTitle className="text-base">Позиции заказа</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Enter в ОЕМ или кнопка корзины — поиск и подстановка через set_item (как в CRM).
+          </p>
         </CardHeader>
         <CardContent>
           {elementsQuery.isLoading ? (
@@ -411,57 +364,16 @@ export function OrderDetailPage() {
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
             </div>
-          ) : activeElements.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Позиций пока нет. Откройте поиск и добавьте товар в заказ.
-            </p>
           ) : (
-            <Table className="min-w-[900px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10">#</TableHead>
-                  <TableHead>Бренд</TableHead>
-                  <TableHead>Артикул</TableHead>
-                  <TableHead>Наименование</TableHead>
-                  <TableHead>Склад</TableHead>
-                  <TableHead>Статус</TableHead>
-                  <TableHead className="text-right">Кол-во</TableHead>
-                  <TableHead className="text-right">Цена</TableHead>
-                  <TableHead className="text-right">Сумма</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {activeElements.map((el, index) => {
-                  const qty = el.quantity ?? 0
-                  const price = el.retailPrice ?? 0
-                  return (
-                    <TableRow key={el.id}>
-                      <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                      <TableCell className="font-medium">{elementBrand(el)}</TableCell>
-                      <TableCell className="font-mono text-xs">{elementArticle(el)}</TableCell>
-                      <TableCell className="max-w-[20rem] truncate" title={elementName(el)}>
-                        {elementName(el)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {el.item?.warehouseName || '—'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {el.statusDescription || el.status || '—'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{qty || '—'}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatKopecks(price)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
-                        {formatRubles((price * qty) / 100)}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
+            <OrderElementsTable
+              orderId={order.id}
+              orderNumber={displayNumber}
+              orderStatus={order.status}
+              userId={user?.id}
+              elements={elements}
+              onRefresh={refreshElements}
+              openSearchToken={openSearchToken}
+            />
           )}
         </CardContent>
       </Card>
