@@ -193,3 +193,43 @@ export async function copyOrder(orderId: number): Promise<{ orderId?: number }> 
   const { data } = await http.post<{ orderId?: number }>(`/order/copy/${orderId}`)
   return data
 }
+
+async function assertChangeSuccess(data: { result?: string; message?: string } | unknown) {
+  if (data && typeof data === 'object' && 'result' in data && data.result === 'error') {
+    throw new Error(
+      (data as { message?: string }).message || 'Не удалось сохранить изменения',
+    )
+  }
+}
+
+/** POST /order/change_customer/{orderId}/{field} — JSON body как в CRM. */
+export async function changeOrderCustomerField(
+  orderId: number,
+  field: 'firstname' | 'lastname' | 'fathername' | 'phone' | 'email',
+  body: Record<string, unknown>,
+): Promise<void> {
+  const { data } = await http.post<{ result?: string; message?: string }>(
+    `/order/change_customer/${orderId}/${field}`,
+    body,
+  )
+  await assertChangeSuccess(data)
+}
+
+export async function changeOrderCar(
+  orderId: number,
+  payload: {
+    action?: string
+    id?: number | null
+    brand?: string
+    model?: string
+    vin?: string
+    carNumber?: string
+    carNumberRegion?: string
+  },
+): Promise<void> {
+  const { data } = await http.post<{ result?: string; message?: string }>(
+    `/order/${orderId}/change_car`,
+    payload,
+  )
+  await assertChangeSuccess(data)
+}

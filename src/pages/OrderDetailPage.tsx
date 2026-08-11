@@ -1,10 +1,11 @@
-import { useMemo, type ReactNode } from 'react'
-import { useQueries, useQuery } from '@tanstack/react-query'
+import { useMemo, useState, type ReactNode } from 'react'
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import {
   ExternalLink,
   Mail,
+  Pencil,
   Phone,
   Search,
   User,
@@ -18,6 +19,7 @@ import {
   fetchOrderPayments,
   fetchOrderStatus,
 } from '@/features/orders/api'
+import { CustomerEditForm } from '@/features/orders/CustomerEditForm'
 import { formatRubles, orderStatusLabel, orderStatusVariant } from '@/features/orders/status'
 import type { OrderElement } from '@/entities/order/types'
 import { Badge } from '@/components/ui/badge'
@@ -103,6 +105,8 @@ function DataRow({
 export function OrderDetailPage() {
   const { publicNumber = '' } = useParams()
   const orderId = publicNumberToOrderId(publicNumber)
+  const queryClient = useQueryClient()
+  const [editingCustomer, setEditingCustomer] = useState(false)
 
   const enabled = Number.isFinite(orderId)
 
@@ -290,64 +294,97 @@ export function OrderDetailPage() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Клиент</CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-base">Клиент</CardTitle>
+              {!editingCustomer ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditingCustomer(true)}
+                >
+                  <Pencil className="size-3.5" />
+                  Изменить
+                </Button>
+              ) : null}
+            </div>
           </CardHeader>
           <CardContent className="pt-0">
-            <DataRow label="ФИО">
-              <span className="inline-flex items-center gap-2">
-                <User className="size-4 text-muted-foreground" />
-                {customerQuery.isLoading ? <Skeleton className="h-4 w-40" /> : fullName}
-              </span>
-            </DataRow>
-            <DataRow label="Телефон">
-              <span className="inline-flex items-center gap-2">
-                <Phone className="size-4 text-muted-foreground" />
-                {telHref && phoneLabel ? (
-                  <a
-                    href={telHref}
-                    className="font-bold text-blue-600 hover:text-blue-800 hover:underline"
-                  >
-                    {phoneLabel}
-                  </a>
-                ) : (
-                  '—'
-                )}
-              </span>
-            </DataRow>
-            <DataRow label="Email">
-              <span className="inline-flex items-center gap-2">
-                <Mail className="size-4 text-muted-foreground" />
-                {order.customerEmail || customer?.email || '—'}
-              </span>
-            </DataRow>
-            <DataRow label="Автомобиль">
-              <span className="inline-flex items-start gap-2">
-                <Car className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <span>
-                  {[order.carBrand, order.carModel].filter(Boolean).join(' ') || 'не указан'}
-                  {order.carVin ? (
-                    <span className="mt-1 block font-mono text-xs text-muted-foreground">
-                      VIN {order.carVin}
+            {editingCustomer ? (
+              <CustomerEditForm
+                orderId={order.id}
+                order={order}
+                customer={customer}
+                onCancel={() => setEditingCustomer(false)}
+                onSaved={async () => {
+                  await Promise.all([
+                    queryClient.invalidateQueries({ queryKey: ['order', orderId] }),
+                    queryClient.invalidateQueries({ queryKey: ['order-customer', orderId] }),
+                  ])
+                  setEditingCustomer(false)
+                }}
+              />
+            ) : (
+              <>
+                <DataRow label="ФИО">
+                  <span className="inline-flex items-center gap-2">
+                    <User className="size-4 text-muted-foreground" />
+                    {customerQuery.isLoading ? <Skeleton className="h-4 w-40" /> : fullName}
+                  </span>
+                </DataRow>
+                <DataRow label="Телефон">
+                  <span className="inline-flex items-center gap-2">
+                    <Phone className="size-4 text-muted-foreground" />
+                    {telHref && phoneLabel ? (
+                      <a
+                        href={telHref}
+                        className="font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {phoneLabel}
+                      </a>
+                    ) : (
+                      '—'
+                    )}
+                  </span>
+                </DataRow>
+                <DataRow label="Email">
+                  <span className="inline-flex items-center gap-2">
+                    <Mail className="size-4 text-muted-foreground" />
+                    {order.customerEmail || customer?.email || '—'}
+                  </span>
+                </DataRow>
+                <DataRow label="Автомобиль">
+                  <span className="inline-flex items-start gap-2">
+                    <Car className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <span>
+                      {[order.carBrand, order.carModel]
+                        .filter((v) => v && v !== '*')
+                        .join(' ') || 'не указан'}
+                      {order.carVin && order.carVin !== '*' ? (
+                        <span className="mt-1 block font-mono text-xs text-muted-foreground">
+                          VIN {order.carVin}
+                        </span>
+                      ) : null}
                     </span>
-                  ) : null}
-                </span>
-              </span>
-            </DataRow>
-            <DataRow label="Доставка / ТК">
-              <span className="inline-flex items-center gap-2">
-                <MapPin className="size-4 text-muted-foreground" />
-                {order.transportCompanyAlias
-                  ? `${order.transportCompanyAlias}${
-                      order.transportCompanyPrice
-                        ? ` · ${formatRubles(order.transportCompanyPrice)}`
-                        : ''
-                    }`
-                  : 'Самовывоз / не указана'}
-              </span>
-            </DataRow>
-            {customer?.typeDescription ? (
-              <DataRow label="Тип клиента">{customer.typeDescription}</DataRow>
-            ) : null}
+                  </span>
+                </DataRow>
+                <DataRow label="Доставка / ТК">
+                  <span className="inline-flex items-center gap-2">
+                    <MapPin className="size-4 text-muted-foreground" />
+                    {order.transportCompanyAlias
+                      ? `${order.transportCompanyAlias}${
+                          order.transportCompanyPrice
+                            ? ` · ${formatRubles(order.transportCompanyPrice)}`
+                            : ''
+                        }`
+                      : 'Самовывоз / не указана'}
+                  </span>
+                </DataRow>
+                {customer?.typeDescription ? (
+                  <DataRow label="Тип клиента">{customer.typeDescription}</DataRow>
+                ) : null}
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

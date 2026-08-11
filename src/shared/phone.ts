@@ -4,6 +4,18 @@ export function digitsOnlyPhone(phone?: string | null): string {
 }
 
 /**
+ * Локальный номер для API CRM (10 цифр без кода страны),
+ * как в OrderCustomerPhone.jsx.
+ */
+export function phoneToApiLocal(phone?: string | null): string {
+  let digits = digitsOnlyPhone(phone)
+  if (digits.length === 11 && (digits.startsWith('7') || digits.startsWith('8'))) {
+    digits = digits.slice(1)
+  }
+  return digits
+}
+
+/**
  * E.164 для tel: — Mango / системный диалер.
  * Бэкенд списка часто отдаёт 10 цифр без кода страны.
  */
