@@ -2,11 +2,30 @@ import { http } from '@/shared/api/http'
 import type {
   CreateFranchisingOrderPayload,
   Order,
+  OrderCustomerFieldData,
   OrderElement,
   OrderListItem,
+  OrderPaymentsFieldData,
   OrdersListFilters,
   OrdersListGroup,
+  OrderStatusFieldData,
 } from '@/entities/order/types'
+
+function assertOrderPayload(data: unknown, orderId: number): Order {
+  if (Array.isArray(data) || !data || typeof data !== 'object') {
+    throw new Error(
+      `Заказ #${orderId} недоступен (пустой ответ API — часто Referer / checkResponseUrl).`,
+    )
+  }
+  const order = data as Order
+  if (order.denied_show) {
+    throw new Error('Нет доступа к чужому заказу.')
+  }
+  if (!order.id) {
+    throw new Error(`Заказ #${orderId} не найден.`)
+  }
+  return order
+}
 
 /** Ответ GET /order/list: объект, ключи — числовой порядок стадий (1…7). */
 type LegacyOrdersListResponse = Record<
@@ -92,14 +111,39 @@ export async function fetchOrdersList(
 }
 
 export async function fetchOrder(orderId: number): Promise<Order> {
-  const { data } = await http.get<Order>(`/order/${orderId}`)
+  const { data } = await http.get<unknown>(`/order/${orderId}`)
+  return assertOrderPayload(data, orderId)
+}
+
+export async function fetchOrderCustomer(orderId: number): Promise<OrderCustomerFieldData> {
+  const { data } = await http.get<OrderCustomerFieldData | unknown[]>(
+    `/order/${orderId}/field_data/customer`,
+  )
+  if (Array.isArray(data) || !data) return {}
   return data
 }
 
+export async function fetchOrderStatus(orderId: number): Promise<OrderStatusFieldData | null> {
+  const { data } = await http.get<OrderStatusFieldData | unknown[]>(
+    `/order/${orderId}/field_data/status`,
+  )
+  if (Array.isArray(data) || !data || typeof data !== 'object') return null
+  return data as OrderStatusFieldData
+}
+
+export async function fetchOrderPayments(orderId: number): Promise<OrderPaymentsFieldData | null> {
+  const { data } = await http.get<OrderPaymentsFieldData | unknown[]>(
+    `/order/${orderId}/field_data/payments`,
+  )
+  if (Array.isArray(data) || !data || typeof data !== 'object') return null
+  return data as OrderPaymentsFieldData
+}
+
 export async function fetchOrderElements(orderId: number): Promise<OrderElement[]> {
-  const { data } = await http.get<{ elements: OrderElement[] }>(
+  const { data } = await http.get<{ elements?: OrderElement[] } | unknown[]>(
     `/order/${orderId}/elements_for_manager_order_interface`,
   )
+  if (Array.isArray(data) || !data) return []
   return data.elements ?? []
 }
 

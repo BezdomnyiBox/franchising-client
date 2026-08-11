@@ -37,6 +37,7 @@ export function AppShell() {
               <NavLink
                 key={to}
                 to={to}
+                end={to === '/orders'}
                 className={({ isActive }) =>
                   cn(
                     'inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors',

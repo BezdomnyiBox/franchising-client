@@ -45,35 +45,105 @@ export interface OrdersListGroup {
   marginAmount: number
 }
 
+/** Ответ GET /order/{id} — OrderObject::getForManagerOrder. */
 export interface Order {
   id: number
-  number?: number | string
+  number: number
   status: OrderStatus
-  createdAt?: string
-  phone?: string
-  email?: string
-  firstName?: string
-  lastName?: string
-  fatherName?: string
+  statusDescription?: string
+  createdDate?: string
+  assemblyTime?: string | null
+  workManager?: string
+  workManagerId?: number | null
+  clientSource?: string
+  clientSourceDescription?: string
+  customerPhone?: string
+  customerAdditionalPhone?: string
+  customerEmail?: string
+  customerType?: string
+  customerLegalName?: string
   carBrand?: string
   carModel?: string
   carVin?: string
-  branchId?: number
-  totalPrice?: number
-  comment?: string
+  branchId?: number | null
+  branchTownName?: string
+  branchAddress?: string
+  mobileHash?: string
+  partsPrice?: number
+  transportCompanyAlias?: string
+  transportCompanyPrice?: number
+  paymentAmount?: number
+  paymentsCount?: number
+  issetPayments?: number
+  denied_show?: boolean
   [key: string]: unknown
 }
 
+export interface OrderCustomerFieldData {
+  id?: number | null
+  fullName?: string
+  firstname?: string
+  lastname?: string
+  fathername?: string
+  phone?: string
+  email?: string
+  type?: string
+  typeDescription?: string
+  isInBlackList?: boolean
+}
+
+export interface OrderStatusFieldData {
+  status: OrderStatus
+  statusDescription: string
+  history: Array<{
+    status: string
+    description: string
+    date: string
+    color?: string
+  }>
+  refusingReason?: string | null
+  refusingReasonComment?: string | null
+}
+
+export interface OrderPaymentsFieldData {
+  payments: Array<{
+    id: number
+    description?: string
+    price?: number
+    date?: string
+  }>
+  paymentAmount: number
+  isSuccessBankPayment?: boolean
+}
+
+export interface OrderElementProduct {
+  id?: number
+  article?: string
+  articleSearch?: string
+  name?: string
+  brand?: { id?: number; name?: string }
+  weight?: number
+}
+
+export interface OrderElementItem {
+  id?: number
+  warehouseName?: string
+  supplierAlias?: string
+  product?: OrderElementProduct
+}
+
+/** Элемент из elements_for_manager_order_interface. */
 export interface OrderElement {
   id: number
-  article?: string
-  brand?: string
-  name?: string
   quantity?: number
-  price?: number
   status?: string
-  weight?: number
+  statusDescription?: string
   description?: string
+  oem?: string
+  retailPrice?: number
+  offerPrice?: number
+  weight?: number
+  item?: OrderElementItem | null
   [key: string]: unknown
 }
 
