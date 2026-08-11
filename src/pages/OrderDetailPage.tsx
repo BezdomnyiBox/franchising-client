@@ -83,7 +83,6 @@ export function OrderDetailPage() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const [editingCustomer, setEditingCustomer] = useState(false)
-  const [openSearchToken, setOpenSearchToken] = useState(0)
 
   const enabled = Number.isFinite(orderId)
 
@@ -206,9 +205,11 @@ export function OrderDetailPage() {
               </a>
             </Button>
           ) : null}
-          <Button type="button" onClick={() => setOpenSearchToken((n) => n + 1)}>
-            <Search className="size-4" />
-            Найти товар
+          <Button asChild>
+            <Link to={`/search?orderNumber=${displayNumber}`}>
+              <Search className="size-4" />
+              Найти товар
+            </Link>
           </Button>
         </div>
       </div>
@@ -372,7 +373,6 @@ export function OrderDetailPage() {
               userId={user?.id}
               elements={elements}
               onRefresh={refreshElements}
-              openSearchToken={openSearchToken}
             />
           )}
         </CardContent>
