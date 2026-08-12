@@ -102,12 +102,13 @@ export function SearchForOrderDialog({
   })
 
   const offersQuery = useQuery({
-    queryKey: ['product-search', selectedTip?.id, orderId, userId],
+    queryKey: ['product-search', selectedTip?.id, orderId, userId, 'available'],
     queryFn: () =>
       fetchProductSearch({
         productId: selectedTip!.id,
         orderId,
         userId,
+        availableOnly: true,
       }),
     enabled: open && selectedTip != null,
   })

@@ -1,5 +1,8 @@
 import { http } from '@/shared/api/http'
 import type {
+  AnalogProduct,
+  AnalogsListResult,
+  AvailabilityFilter,
   ProductOffer,
   ProductSearchCount,
   ProductSearchResult,
@@ -7,6 +10,11 @@ import type {
   SearchOffersParams,
   SearchTipsParams,
 } from '@/entities/product/types'
+
+function asArray<T>(value: T[] | Record<string, T> | null | undefined): T[] {
+  if (!value) return []
+  return Array.isArray(value) ? value : Object.values(value)
+}
 
 function tipBrandName(tip: ProductTip): string {
   if (!tip.brand) return ''
@@ -55,6 +63,20 @@ export async function fetchProductTips(params: SearchTipsParams): Promise<Produc
   return data.tips ?? []
 }
 
+export function filterOffersByAvailability(
+  items: ProductOffer[],
+  filter: AvailabilityFilter,
+): ProductOffer[] {
+  switch (filter) {
+    case 'available':
+      return items.filter((item) => (item.stock ?? 0) > 0)
+    case 'order':
+      return items.filter((item) => (item.stock ?? 0) === 0)
+    default:
+      return items
+  }
+}
+
 export async function fetchProductSearch(
   params: SearchOffersParams,
 ): Promise<ProductSearchResult> {
@@ -68,18 +90,49 @@ export async function fetchProductSearch(
     },
   )
 
+  const availableOnly = params.availableOnly === true
+
   if (Array.isArray(data)) {
-    return {
-      id: params.productId,
-      items: data.map(mapSearchOffer).filter((o) => (o.stock ?? 0) > 0),
-    }
+    const items = data
+      .map(mapSearchOffer)
+      .filter((o) => (availableOnly ? (o.stock ?? 0) > 0 : true))
+    return { id: params.productId, items }
   }
 
   const items = (data.items ?? [])
     .map(mapSearchOffer)
-    .filter((o) => (o.stock ?? 0) > 0 && o.accessAddToOrder !== false)
+    .filter((o) => {
+      if (o.accessAddToOrder === false) return false
+      if (availableOnly) return (o.stock ?? 0) > 0
+      return true
+    })
 
   return { ...data, items }
+}
+
+export async function fetchAnalogsList(
+  productId: number,
+  componentType: 'full' | 'part',
+  params?: { orderId?: number; userId?: number },
+): Promise<AnalogProduct[]> {
+  const { data } = await http.get<AnalogsListResult | AnalogProduct[]>(
+    `/product/${productId}/analogs_list`,
+    {
+      params: {
+        componentType,
+        isFast: 1,
+        orderId: params?.orderId,
+        userId: params?.userId,
+      },
+    },
+  )
+
+  if (Array.isArray(data)) return data
+
+  return asArray(data.offerItems).map((item) => ({
+    ...item,
+    ourItemsCount: item.ourItemsCount ?? item.ourItems?.length ?? 0,
+  }))
 }
 
 /** @deprecated — используйте fetchProductSearch; оставлено для SearchPage. */
