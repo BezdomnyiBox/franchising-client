@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, ArrowUpDown, RefreshCw } from 'lucide-react'
 import type {
   AvailabilityFilter,
@@ -20,6 +20,10 @@ import {
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
+const SKIP_AUTO_SUPPLIERS = new Set(['autopiter', 'emex', 'berg'])
+/** Свежесть как в CRM UpdateIndicator: 2 суток. */
+const FRESH_PERIOD_MIN = 2880
+
 function offerPriceLabel(offer: ProductOffer): string {
   const price = offer.offerPrice ?? offer.price
   if (price == null) return '—'
@@ -30,6 +34,56 @@ function deliveryLabel(offer: ProductOffer): string {
   if (offer.deliveryDays == null) return '—'
   if (offer.deliveryDays === 0) return 'на складе'
   return `${offer.deliveryDays} дн.`
+}
+
+function parseUpdateTime(value: unknown): Date | null {
+  if (!value) return null
+  if (value instanceof Date) return value
+  if (typeof value === 'string') {
+    const d = new Date(value)
+    return Number.isNaN(d.getTime()) ? null : d
+  }
+  if (typeof value === 'object' && value && 'date' in value) {
+    const d = new Date(String((value as { date: string }).date))
+    return Number.isNaN(d.getTime()) ? null : d
+  }
+  return null
+}
+
+function minutesAgo(date: Date | null): number {
+  if (!date) return FRESH_PERIOD_MIN
+  return Math.max(0, Math.ceil((Date.now() - date.getTime()) / 60_000))
+}
+
+function freshnessColor(minutes: number): string {
+  const left = Math.max(0, FRESH_PERIOD_MIN - minutes)
+  const pct = (left / FRESH_PERIOD_MIN) * 100
+  if (pct >= 99.9) return '#34CC00'
+  if (pct >= 99) return '#88FF00'
+  if (pct >= 70) return '#EEEA00'
+  if (pct >= 50) return '#FFB000'
+  if (pct >= 20) return '#FF6000'
+  return '#EF0000'
+}
+
+function formatRelevance(minutes: number): string {
+  if (!minutes) return 'менее минуты'
+  const days = Math.floor(minutes / 1440)
+  const hours = Math.floor((minutes % 1440) / 60)
+  const mins = minutes % 60
+  return [
+    days > 0 ? `${days}д` : '',
+    hours > 0 ? `${hours}ч` : '',
+    mins > 0 ? `${mins}м` : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
+function shouldAutoUpdate(offer: ProductOffer): boolean {
+  return Boolean(
+    offer.updateable && !SKIP_AUTO_SUPPLIERS.has(String(offer.supplierAlias ?? '')),
+  )
 }
 
 function SortHead({
@@ -50,7 +104,7 @@ function SortHead({
   const Icon =
     active !== field ? ArrowUpDown : direction === 'asc' ? ArrowUp : ArrowDown
   return (
-    <TableHead className={align === 'right' ? 'text-right' : undefined}>
+    <TableHead className={cn('sticky top-0 z-10 bg-background', align === 'right' && 'text-right')}>
       <button
         type="button"
         className={cn(
@@ -64,6 +118,45 @@ function SortHead({
         <Icon className="size-3.5" />
       </button>
     </TableHead>
+  )
+}
+
+function OfferUpdateControl({
+  offer,
+  updating,
+  onRefresh,
+}: {
+  offer: ProductOffer
+  updating: boolean
+  onRefresh: () => void
+}) {
+  if (!offer.updateable) return null
+
+  const updatedAt = parseUpdateTime(offer.updateTime)
+  const mins = minutesAgo(updatedAt)
+  const color = freshnessColor(mins)
+  const title = updatedAt
+    ? `${formatRelevance(mins)} · ${updatedAt.toLocaleString('ru-RU')}`
+    : 'Обновить остаток у поставщика'
+
+  return (
+    <button
+      type="button"
+      title={title}
+      disabled={updating}
+      onClick={onRefresh}
+      className={cn(
+        'relative inline-flex size-7 items-center justify-center rounded-full border bg-background',
+        updating ? 'cursor-wait opacity-70' : 'hover:bg-muted',
+      )}
+      style={{ borderColor: color }}
+    >
+      <span
+        className="absolute inset-0 rounded-full opacity-30"
+        style={{ boxShadow: `inset 0 0 0 2px ${color}` }}
+      />
+      <RefreshCw className={cn('size-3.5', updating && 'animate-spin')} style={{ color }} />
+    </button>
   )
 }
 
@@ -104,13 +197,117 @@ export function SearchOffersTable({
 }: SearchOffersTableProps) {
   const [sortField, setSortField] = useState<OfferSortField>('price')
   const [sortDir, setSortDir] = useState<SortDirection>('asc')
-  const [refreshingId, setRefreshingId] = useState<number | null>(null)
-  const [autoTried, setAutoTried] = useState<Set<number>>(() => new Set())
+  const [refreshingIds, setRefreshingIds] = useState<Set<number>>(() => new Set())
+  const [pendingCount, setPendingCount] = useState(0)
+
+  const autoTriedRef = useRef<Set<number>>(new Set())
+  const queueRef = useRef<number[]>([])
+  const runningRef = useRef(false)
+  const cancelledRef = useRef(false)
+  const offersByIdRef = useRef<Map<number, ProductOffer>>(new Map())
+  const callbacksRef = useRef({ onOfferPatched, onNeedFullReload, orderId, branchId })
+
+  callbacksRef.current = { onOfferPatched, onNeedFullReload, orderId, branchId }
 
   const sorted = useMemo(
     () => sortOffers(offers, sortField, sortDir),
     [offers, sortField, sortDir],
   )
+
+  useEffect(() => {
+    offersByIdRef.current = new Map(offers.map((o) => [o.id, o]))
+  }, [offers])
+
+  const syncPending = () => setPendingCount(queueRef.current.length)
+
+  const setRefreshing = (id: number, active: boolean) => {
+    setRefreshingIds((prev) => {
+      const next = new Set(prev)
+      if (active) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }
+
+  const runQueue = async () => {
+    if (runningRef.current) return
+    runningRef.current = true
+
+    while (queueRef.current.length > 0 && !cancelledRef.current) {
+      const itemId = queueRef.current.shift()!
+      syncPending()
+      const offer = offersByIdRef.current.get(itemId)
+      if (!offer || !shouldAutoUpdate(offer)) continue
+
+      setRefreshing(itemId, true)
+      try {
+        const { orderId: oid, branchId: bid, onOfferPatched: patch, onNeedFullReload: reload } =
+          callbacksRef.current
+        const updated = await updateProductItem(itemId, {
+          orderId: oid,
+          branchId: bid,
+        })
+        if (cancelledRef.current) break
+        patch?.(updated)
+        if (updated.needUpdate) {
+          reload?.()
+          queueRef.current = []
+          syncPending()
+          break
+        }
+      } catch {
+        /* одна ошибка поставщика не останавливает очередь */
+      } finally {
+        setRefreshing(itemId, false)
+      }
+    }
+
+    runningRef.current = false
+    syncPending()
+  }
+
+  /** Как в CRM SearchProductItem: каждый updateable-оффер лениво бьёт update_item. */
+  useEffect(() => {
+    cancelledRef.current = false
+
+    const candidates = offers.filter(shouldAutoUpdate)
+    let added = false
+    for (const offer of candidates) {
+      if (autoTriedRef.current.has(offer.id)) continue
+      autoTriedRef.current.add(offer.id)
+      queueRef.current.push(offer.id)
+      added = true
+    }
+    if (added) syncPending()
+
+    void runQueue()
+
+    return () => {
+      cancelledRef.current = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- полный проход по новым id офферов
+  }, [offers.map((o) => o.id).join(',')])
+
+  /** Сброс «уже обновляли», если сменился набор поиска. */
+  const offersSignature = offers.map((o) => o.id).join(',')
+  const prevSignature = useRef(offersSignature)
+  useEffect(() => {
+    if (prevSignature.current === offersSignature) return
+    const prevIds = new Set(
+      prevSignature.current
+        .split(',')
+        .filter(Boolean)
+        .map(Number),
+    )
+    const nextIds = offers.map((o) => o.id)
+    const overlap = nextIds.filter((id) => prevIds.has(id)).length
+    if (nextIds.length > 0 && overlap < nextIds.length * 0.5) {
+      autoTriedRef.current = new Set()
+      queueRef.current = []
+      syncPending()
+    }
+    prevSignature.current = offersSignature
+  }, [offersSignature, offers])
 
   const onSort = (field: OfferSortField) => {
     if (sortField === field) {
@@ -118,58 +315,24 @@ export function SearchOffersTable({
       return
     }
     setSortField(field)
-    setSortDir(field === 'warehouse' ? 'asc' : 'asc')
+    setSortDir('asc')
   }
 
   const refreshOffer = async (offer: ProductOffer) => {
-    if (refreshingId === offer.id) return
-    setRefreshingId(offer.id)
+    if (refreshingIds.has(offer.id)) return
+    setRefreshing(offer.id, true)
     try {
       const updated = await updateProductItem(offer.id, { orderId, branchId })
       onOfferPatched?.(updated)
       if (updated.needUpdate) onNeedFullReload?.()
     } finally {
-      setRefreshingId(null)
+      setRefreshing(offer.id, false)
     }
   }
 
-  /** Ленивое автообновление API-складов (как UpdateIndicator в CRM). */
-  useEffect(() => {
-    const candidates = offers.filter(
-      (o) =>
-        o.updateable &&
-        !['autopiter', 'emex', 'berg'].includes(String(o.supplierAlias ?? '')) &&
-        !autoTried.has(o.id),
-    )
-    if (!candidates.length) return
-
-    const next = candidates.slice(0, 3)
-    setAutoTried((prev) => {
-      const copy = new Set(prev)
-      next.forEach((o) => copy.add(o.id))
-      return copy
-    })
-
-    void (async () => {
-      for (const offer of next) {
-        try {
-          const updated = await updateProductItem(offer.id, { orderId, branchId })
-          onOfferPatched?.(updated)
-          if (updated.needUpdate) {
-            onNeedFullReload?.()
-            break
-          }
-        } catch {
-          /* ignore single refresh errors */
-        }
-      }
-    })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- auto once per new offer ids
-  }, [offers.map((o) => o.id).join(',')])
-
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {(
           [
             { id: 'available', label: `В наличии (${availableCount})` },
@@ -186,6 +349,13 @@ export function SearchOffersTable({
             {opt.label}
           </Button>
         ))}
+        {refreshingIds.size > 0 || pendingCount > 0 ? (
+          <span className="text-xs text-muted-foreground">
+            Обновление API-складов… (
+            {refreshingIds.size} в работе
+            {pendingCount > 0 ? `, в очереди ${pendingCount}` : ''})
+          </span>
+        ) : null}
       </div>
 
       {loading ? (
@@ -198,103 +368,94 @@ export function SearchOffersTable({
       ) : sorted.length === 0 ? (
         <p className="text-sm text-muted-foreground">{emptyText}</p>
       ) : (
-        <Table className="min-w-[760px]">
-          <TableHeader>
-            <TableRow>
-              <SortHead
-                label="Склад"
-                field="warehouse"
-                active={sortField}
-                direction={sortDir}
-                onSort={onSort}
-              />
-              <SortHead
-                label="Цена"
-                field="price"
-                active={sortField}
-                direction={sortDir}
-                align="right"
-                onSort={onSort}
-              />
-              <TableHead className="w-10" />
-              <SortHead
-                label="Срок доставки"
-                field="delivery"
-                active={sortField}
-                direction={sortDir}
-                onSort={onSort}
-              />
-              <SortHead
-                label="Кол-во"
-                field="quantity"
-                active={sortField}
-                direction={sortDir}
-                align="right"
-                onSort={onSort}
-              />
-              <TableHead className="text-right">Действие</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sorted.map((offer) => (
-              <TableRow
-                key={offer.id}
-                className={cn(addingItemId === offer.id && 'bg-muted/50')}
-              >
-                <TableCell>
-                  <div className="font-medium">{offer.warehouseName || '—'}</div>
-                  {offer.supplierAlias ? (
-                    <div className="text-xs text-muted-foreground">{offer.supplierAlias}</div>
-                  ) : null}
-                </TableCell>
-                <TableCell className="text-right tabular-nums font-medium">
-                  {offerPriceLabel(offer)}
-                  {offer.multiplicity && offer.multiplicity > 1 ? (
-                    <div className="text-xs text-amber-600">×{offer.multiplicity}</div>
-                  ) : null}
-                </TableCell>
-                <TableCell>
-                  {offer.updateable ? (
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="size-7"
-                      title="Обновить остаток у поставщика"
-                      disabled={refreshingId === offer.id}
-                      onClick={() => void refreshOffer(offer)}
-                    >
-                      <RefreshCw
-                        className={cn(
-                          'size-3.5',
-                          refreshingId === offer.id && 'animate-spin',
-                        )}
-                      />
-                    </Button>
-                  ) : null}
-                </TableCell>
-                <TableCell>{deliveryLabel(offer)}</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {offer.quantity ?? offer.stock ?? '—'}
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    size="sm"
-                    disabled={!canAdd || addingItemId === offer.id}
-                    title={
-                      canAdd
-                        ? 'Добавить позицию в заказ'
-                        : 'Укажите № заказа или откройте поиск из карточки'
-                    }
-                    onClick={() => onAdd(offer)}
-                  >
-                    {addingItemId === offer.id ? '…' : 'В заказ'}
-                  </Button>
-                </TableCell>
+        <div className="max-h-[min(60vh,560px)] overflow-auto rounded-md border">
+          <Table className="min-w-[760px]">
+            <TableHeader>
+              <TableRow>
+                <SortHead
+                  label="Склад"
+                  field="warehouse"
+                  active={sortField}
+                  direction={sortDir}
+                  onSort={onSort}
+                />
+                <SortHead
+                  label="Цена"
+                  field="price"
+                  active={sortField}
+                  direction={sortDir}
+                  align="right"
+                  onSort={onSort}
+                />
+                <TableHead className="sticky top-0 z-10 w-10 bg-background" />
+                <SortHead
+                  label="Срок доставки"
+                  field="delivery"
+                  active={sortField}
+                  direction={sortDir}
+                  onSort={onSort}
+                />
+                <SortHead
+                  label="Кол-во"
+                  field="quantity"
+                  active={sortField}
+                  direction={sortDir}
+                  align="right"
+                  onSort={onSort}
+                />
+                <TableHead className="sticky top-0 z-10 bg-background text-right">
+                  Действие
+                </TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {sorted.map((offer) => (
+                <TableRow
+                  key={offer.id}
+                  className={cn(addingItemId === offer.id && 'bg-muted/50')}
+                >
+                  <TableCell>
+                    <div className="font-medium">{offer.warehouseName || '—'}</div>
+                    {offer.supplierAlias ? (
+                      <div className="text-xs text-muted-foreground">{offer.supplierAlias}</div>
+                    ) : null}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums font-medium">
+                    {offerPriceLabel(offer)}
+                    {offer.multiplicity && offer.multiplicity > 1 ? (
+                      <div className="text-xs text-amber-600">×{offer.multiplicity}</div>
+                    ) : null}
+                  </TableCell>
+                  <TableCell>
+                    <OfferUpdateControl
+                      offer={offer}
+                      updating={refreshingIds.has(offer.id)}
+                      onRefresh={() => void refreshOffer(offer)}
+                    />
+                  </TableCell>
+                  <TableCell>{deliveryLabel(offer)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {offer.quantity ?? offer.stock ?? '—'}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      disabled={!canAdd || addingItemId === offer.id}
+                      title={
+                        canAdd
+                          ? 'Добавить позицию в заказ'
+                          : 'Укажите № заказа или откройте поиск из карточки'
+                      }
+                      onClick={() => onAdd(offer)}
+                    >
+                      {addingItemId === offer.id ? '…' : 'В заказ'}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </div>
   )

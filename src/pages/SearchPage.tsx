@@ -264,6 +264,7 @@ export function SearchPage() {
     queryKey: ['product-search-count', selectedTip?.id, orderId],
     queryFn: () => fetchProductSearchCount(selectedTip!.id, orderId),
     enabled: selectedTip != null,
+    retry: false,
   })
 
   const offersQuery = useQuery({
@@ -285,6 +286,7 @@ export function SearchPage() {
         userId: user?.id,
       }),
     enabled: selectedTip != null && resultTab === 'analogs',
+    retry: false,
   })
 
   const partsQuery = useQuery({
@@ -295,11 +297,16 @@ export function SearchPage() {
         userId: user?.id,
       }),
     enabled: selectedTip != null && resultTab === 'parts',
+    retry: false,
   })
 
   const allOffers = offersQuery.data?.items ?? []
   const offers = filterOffersByAvailability(allOffers, availabilityFilter)
-  const ourProducts = countQuery.data?.ourProductsInSearchResult ?? []
+  const ourProducts =
+    countQuery.data?.ourProductsInSearchResult ??
+    allOffers
+      .filter((o) => ['podzamenu', 'new_podzamenu'].includes(String(o.supplierAlias ?? '')))
+      .map((o) => o.id)
 
   const addMutation = useMutation({
     mutationFn: async ({
