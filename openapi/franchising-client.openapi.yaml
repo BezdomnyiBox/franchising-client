@@ -483,6 +483,199 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /order/{orderId}/field_data/transport_company:
+    get:
+      tags: [Orders]
+      summary: Список транспортных компаний для заказа
+      operationId: getOrderTransportCompanies
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [list]
+                properties:
+                  list:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TransportCompanyOption'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order/{orderId}/change_transport_company:
+    post:
+      tags: [Orders]
+      summary: Сменить транспортную компанию
+      operationId: changeOrderTransportCompany
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [alias]
+              properties:
+                alias:
+                  type: string
+                  description: Alias ТК из field_data/transport_company
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order/{orderId}/add_comment:
+    post:
+      tags: [Orders]
+      summary: Добавить комментарий к заказу
+      operationId: addOrderComment
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comment, type]
+              properties:
+                comment:
+                  type: string
+                type:
+                  type: string
+                  enum: [personal, collective]
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order/{orderId}/order_elements_with_not_confirmed_weight:
+    get:
+      tags: [Orders]
+      summary: Позиции с неподтверждённым весом
+      operationId: getOrderElementsWithNotConfirmedWeight
+      description: |
+        Если массив не пуст — notify_customer вызывать нельзя (как CRM notifyCustomer).
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: OK — список описаний позиций
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order/{orderId}/notify_customer:
+    post:
+      tags: [Orders]
+      summary: Оповестить клиента (SMS)
+      operationId: notifyCustomer
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order/{orderId}/formed_print:
+    post:
+      tags: [Orders]
+      summary: Сформировать счёт (printHash)
+      operationId: formedPrintOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hideArticle]
+              properties:
+                hideArticle:
+                  type: boolean
+      responses:
+        '200':
+          description: OK — после вызова в заказе появляется printHash
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order/{orderId}/send_print:
+    post:
+      tags: [Orders]
+      summary: Отправить счёт на email клиента
+      operationId: sendPrintOrder
+      description: Требует customerEmail и printHash на заказе.
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /bookkeeping/print_cashier_order/{orderId}:
+    get:
+      tags: [Orders]
+      summary: Печать кассового ордера
+      operationId: printCashierOrder
+      description: |
+        Открывается через window.open (same-origin cookie сессии /crm_fr).
+        URL: {API_BASE_URL}/bookkeeping/print_cashier_order/{orderId}
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: HTML/PDF документ
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /public_invoice/{printHash}:
+    get:
+      tags: [Orders]
+      summary: Публичная ссылка на сформированный счёт
+      operationId: getPublicInvoice
+      parameters:
+        - name: printHash
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: HTML счёта
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /product/tips:
     get:
       tags: [Search]
@@ -674,10 +867,42 @@ components:
             lastName: { type: string }
             fatherName: { type: string }
             email: { type: string }
+            customerEmail: { type: string }
             carBrand: { type: string }
             carModel: { type: string }
             carVin: { type: string }
             comment: { type: string }
+            clientSource: { type: string }
+            transportCompanyAlias: { type: string }
+            transportCompanyPrice: { type: number }
+            printHash:
+              oneOf:
+                - { type: string }
+                - { type: 'null' }
+            personalComments:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrderComment'
+            collectiveComments:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrderComment'
+
+    OrderComment:
+      type: object
+      properties:
+        manager: { type: string }
+        date: { type: string }
+        comment: { type: string }
+
+    TransportCompanyOption:
+      type: object
+      required: [id, alias, name]
+      properties:
+        id: { type: integer }
+        alias: { type: string }
+        name: { type: string }
+        price: { type: number }
 
     OrderElement:
       type: object

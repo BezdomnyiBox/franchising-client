@@ -5,9 +5,12 @@ import { format, parseISO } from 'date-fns'
 import {
   CheckCircle,
   ExternalLink,
+  FileText,
   Mail,
+  MessageSquare,
   Pencil,
   Phone,
+  Printer,
   Search,
   User,
   Car,
@@ -21,18 +24,23 @@ import {
   fetchOrderElements,
   fetchOrderPayments,
   fetchOrderStatus,
+  fetchUnconfirmedWeightElements,
+  notifyCustomer,
 } from '@/features/orders/api'
 import { ConfirmOrderDialog } from '@/features/orders/ConfirmOrderDialog'
 import { CopyOrderActions } from '@/features/orders/CopyOrderActions'
 import { CustomerEditForm } from '@/features/orders/CustomerEditForm'
+import { FormedPrintDialog } from '@/features/orders/FormedPrintDialog'
+import { OrderComments } from '@/features/orders/OrderComments'
 import { OrderElementsTable } from '@/features/orders/OrderElementsTable'
+import { TransportCompanySelect } from '@/features/orders/TransportCompanySelect'
 import { orderStatusLabel, orderStatusVariant, formatRubles } from '@/features/orders/status'
 import { useAuth } from '@/features/auth/AuthContext'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { publicNumberToOrderId } from '@/shared/config'
+import { cashierOrderPrintUrl, publicNumberToOrderId } from '@/shared/config'
 import { formatPhoneRu, toTelHref } from '@/shared/phone'
 import { cn } from '@/lib/utils'
 
@@ -95,6 +103,7 @@ export function OrderDetailPage() {
   const { user } = useAuth()
   const [editingCustomer, setEditingCustomer] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [formedPrintOpen, setFormedPrintOpen] = useState(false)
 
   const enabled = Number.isFinite(orderId)
 
@@ -153,6 +162,34 @@ export function OrderDetailPage() {
     },
   })
 
+  const notifyMutation = useMutation({
+    mutationFn: async () => {
+      const id = orderQuery.data?.id
+      if (!id) throw new Error('Заказ не загружен')
+      const unconfirmed = await fetchUnconfirmedWeightElements(id)
+      if (unconfirmed.length > 0) {
+        const list = unconfirmed.map((text, i) => `${i + 1}. ${text}`).join('\n')
+        return { blocked: true as const, message: `Не подтвержден вес у следующих позиций:\n${list}` }
+      }
+      await notifyCustomer(id)
+      return { blocked: false as const }
+    },
+    onSuccess: async (result) => {
+      if (result.blocked) {
+        toast.warning(result.message)
+        return
+      }
+      toast.success('Клиент оповещён')
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['order', orderId] }),
+        queryClient.invalidateQueries({ queryKey: ['order-status', orderId] }),
+      ])
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Не удалось оповестить клиента')
+    },
+  })
+
   const order = orderQuery.data
   const customer = customerQuery.data
   const statusData = statusQuery.data
@@ -199,10 +236,12 @@ export function OrderDetailPage() {
     customer?.fullName ||
     [customer?.lastname, customer?.firstname, customer?.fathername].filter(Boolean).join(' ') ||
     '—'
+  const statusAlias = statusData?.status || order.status
   const statusText =
     statusData?.statusDescription || order.statusDescription || orderStatusLabel(order.status)
   const payAmount = payments?.paymentAmount
   const payCount = payments?.payments?.length ?? order.paymentsCount ?? 0
+  const customerEmail = order.customerEmail || customer?.email || null
 
   const refreshElements = () => {
     void queryClient.invalidateQueries({ queryKey: ['order-elements', orderId] })
@@ -210,8 +249,11 @@ export function OrderDetailPage() {
   }
 
   const showConfirm =
-    canConfirmOrder(statusData?.status || order.status, order.confirmed) &&
+    canConfirmOrder(statusAlias, order.confirmed) &&
     !(customer?.isInBlackList && !order.paymentsCount)
+
+  const showNotify = statusAlias === 'accepted'
+  const showReNotify = ['notified_customer', 'confirmed', 'collected'].includes(statusAlias)
 
   const openConfirmDialog = () => {
     if (!order.clientSource) {
@@ -219,6 +261,18 @@ export function OrderDetailPage() {
       return
     }
     setConfirmOpen(true)
+  }
+
+  const handleNotify = () => {
+    if (showNotify && !order.clientSource) {
+      toast.warning('Не указан источник обращения')
+      return
+    }
+    notifyMutation.mutate()
+  }
+
+  const openCashierPrint = () => {
+    window.open(cashierOrderPrintUrl(order.id), '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -250,6 +304,17 @@ export function OrderDetailPage() {
               </a>
             </Button>
           ) : null}
+          {showNotify || showReNotify ? (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={notifyMutation.isPending}
+              onClick={handleNotify}
+            >
+              <MessageSquare className="size-4" />
+              {showNotify ? 'Оповестить клиента' : 'Отправить смс повторно'}
+            </Button>
+          ) : null}
           {showConfirm ? (
             <Button
               type="button"
@@ -261,6 +326,14 @@ export function OrderDetailPage() {
               Подтвердить
             </Button>
           ) : null}
+          <Button type="button" variant="outline" onClick={() => setFormedPrintOpen(true)}>
+            <FileText className="size-4" />
+            Сформировать счёт
+          </Button>
+          <Button type="button" variant="outline" onClick={openCashierPrint}>
+            <Printer className="size-4" />
+            Распечатать чек
+          </Button>
           <CopyOrderActions orderId={order.id} variant="button" />
           <Button asChild>
             <Link to={`/search?orderNumber=${displayNumber}`}>
@@ -370,7 +443,7 @@ export function OrderDetailPage() {
                 <DataRow label="Email">
                   <span className="inline-flex items-center gap-2">
                     <Mail className="size-4 text-muted-foreground" />
-                    {order.customerEmail || customer?.email || '—'}
+                    {customerEmail || '—'}
                   </span>
                 </DataRow>
                 <DataRow label="Автомобиль">
@@ -389,16 +462,17 @@ export function OrderDetailPage() {
                   </span>
                 </DataRow>
                 <DataRow label="Доставка / ТК">
-                  <span className="inline-flex items-center gap-2">
-                    <MapPin className="size-4 text-muted-foreground" />
-                    {order.transportCompanyAlias
-                      ? `${order.transportCompanyAlias}${
-                          order.transportCompanyPrice
-                            ? ` · ${formatRubles(order.transportCompanyPrice)}`
-                            : ''
-                        }`
-                      : 'Самовывоз / не указана'}
-                  </span>
+                  <div className="flex items-start gap-2">
+                    <MapPin className="mt-2 size-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <TransportCompanySelect
+                        orderId={order.id}
+                        status={statusAlias}
+                        currentAlias={order.transportCompanyAlias}
+                        currentPrice={order.transportCompanyPrice}
+                      />
+                    </div>
+                  </div>
                 </DataRow>
                 {customer?.typeDescription ? (
                   <DataRow label="Тип клиента">{customer.typeDescription}</DataRow>
@@ -408,6 +482,19 @@ export function OrderDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Комментарии</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <OrderComments
+            orderId={order.id}
+            personalComments={order.personalComments}
+            collectiveComments={order.collectiveComments}
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-3">
@@ -443,6 +530,14 @@ export function OrderDetailPage() {
         onConfirm={async (assemblyTime) => {
           await confirmMutation.mutateAsync(assemblyTime)
         }}
+      />
+
+      <FormedPrintDialog
+        open={formedPrintOpen}
+        orderId={order.id}
+        printHash={order.printHash}
+        customerEmail={customerEmail}
+        onClose={() => setFormedPrintOpen(false)}
       />
     </div>
   )

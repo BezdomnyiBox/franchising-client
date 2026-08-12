@@ -45,6 +45,22 @@ export interface OrdersListGroup {
   marginAmount: number
 }
 
+/** Комментарий из GET /order/{id} → personalComments / collectiveComments. */
+export interface OrderComment {
+  manager?: string
+  date?: string
+  comment?: string
+}
+
+/** Элемент списка ТК из GET /order/{id}/field_data/transport_company. */
+export interface TransportCompanyOption {
+  id: number
+  alias: string
+  name: string
+  price?: number
+  [key: string]: unknown
+}
+
 /** Ответ GET /order/{id} — OrderObject::getForManagerOrder. */
 export interface Order {
   id: number
@@ -69,12 +85,15 @@ export interface Order {
   branchTownName?: string
   branchAddress?: string
   mobileHash?: string
+  printHash?: string | null
   partsPrice?: number
   transportCompanyAlias?: string
   transportCompanyPrice?: number
   paymentAmount?: number
   paymentsCount?: number
   issetPayments?: number
+  personalComments?: OrderComment[]
+  collectiveComments?: OrderComment[]
   denied_show?: boolean
   [key: string]: unknown
 }

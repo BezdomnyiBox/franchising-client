@@ -9,6 +9,7 @@ import type {
   OrdersListFilters,
   OrdersListGroup,
   OrderStatusFieldData,
+  TransportCompanyOption,
 } from '@/entities/order/types'
 import axios from 'axios'
 
@@ -350,4 +351,88 @@ export async function changeOrderCar(
     payload,
   )
   await assertChangeSuccess(data)
+}
+
+export async function fetchTransportCompanies(
+  orderId: number,
+): Promise<TransportCompanyOption[]> {
+  return withApiError(async () => {
+    const { data } = await http.get<{ list?: TransportCompanyOption[] } | unknown[]>(
+      `/order/${orderId}/field_data/transport_company`,
+    )
+    if (Array.isArray(data) || !data || typeof data !== 'object') return []
+    return (data as { list?: TransportCompanyOption[] }).list ?? []
+  }, 'Не удалось загрузить список ТК')
+}
+
+export async function changeTransportCompany(
+  orderId: number,
+  alias: string,
+): Promise<void> {
+  return withApiError(async () => {
+    const { data } = await http.post<{ result?: string; message?: string }>(
+      `/order/${orderId}/change_transport_company`,
+      { alias },
+    )
+    await assertChangeSuccess(data)
+  }, 'Не удалось сменить транспортную компанию')
+}
+
+export type OrderCommentType = 'personal' | 'collective'
+
+export async function addOrderComment(
+  orderId: number,
+  comment: string,
+  type: OrderCommentType,
+): Promise<void> {
+  return withApiError(async () => {
+    const { data } = await http.post<{ result?: string; message?: string }>(
+      `/order/${orderId}/add_comment`,
+      { comment, type },
+    )
+    await assertChangeSuccess(data)
+  }, 'Не удалось добавить комментарий')
+}
+
+/** Позиции с неподтверждённым весом — если не пусто, notify не уходит. */
+export async function fetchUnconfirmedWeightElements(
+  orderId: number,
+): Promise<string[]> {
+  return withApiError(async () => {
+    const { data } = await http.get<string[] | unknown>(
+      `/order/${orderId}/order_elements_with_not_confirmed_weight`,
+    )
+    return Array.isArray(data) ? data.map(String) : []
+  }, 'Не удалось проверить вес позиций')
+}
+
+export async function notifyCustomer(orderId: number): Promise<void> {
+  return withApiError(async () => {
+    const { data } = await http.post<{ result?: string; message?: string }>(
+      `/order/${orderId}/notify_customer`,
+    )
+    await assertChangeSuccess(data)
+  }, 'Не удалось оповестить клиента')
+}
+
+export async function formedPrintOrder(
+  orderId: number,
+  hideArticle: boolean,
+): Promise<void> {
+  return withApiError(async () => {
+    const { data } = await http.post<{ result?: string; message?: string }>(
+      `/order/${orderId}/formed_print`,
+      { hideArticle },
+    )
+    await assertChangeSuccess(data)
+  }, 'Не удалось сформировать счёт')
+}
+
+export async function sendPrintOrder(orderId: number): Promise<void> {
+  return withApiError(async () => {
+    const { data } = await http.post<{ result?: string; message?: string }>(
+      `/order/${orderId}/send_print`,
+    )
+    await assertChangeSuccess(data)
+  }, 'Не удалось отправить счёт')
 }

@@ -17,3 +17,13 @@ export function publicNumberToOrderId(publicNumber: string | number): number {
 export function orderIdToPublicNumber(orderId: string | number): number {
   return Number(orderId) - ORDER_NUMBER_OFFSET
 }
+
+/** Печать кассового ордера (same-origin cookie /crm_fr). */
+export function cashierOrderPrintUrl(orderId: number): string {
+  return `${API_BASE_URL}/bookkeeping/print_cashier_order/${orderId}`
+}
+
+/** Публичная ссылка на сформированный счёт. */
+export function publicInvoiceUrl(printHash: string): string {
+  return `${API_BASE_URL}/public_invoice/${printHash}`
+}
