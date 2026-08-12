@@ -3,6 +3,7 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { Link, useParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import {
+  Bell,
   CheckCircle,
   ExternalLink,
   FileText,
@@ -11,6 +12,7 @@ import {
   Pencil,
   Phone,
   Printer,
+  RefreshCw,
   Search,
   User,
   Car,
@@ -18,6 +20,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
+  checkElementsByApi,
   confirmOrder,
   fetchOrder,
   fetchOrderCustomer,
@@ -27,15 +30,22 @@ import {
   fetchUnconfirmedWeightElements,
   notifyCustomer,
 } from '@/features/orders/api'
+import { AddReminderDialog } from '@/features/orders/AddReminderDialog'
 import { ConfirmOrderDialog } from '@/features/orders/ConfirmOrderDialog'
 import { CopyOrderActions } from '@/features/orders/CopyOrderActions'
+import {
+  CustomerOrdersHistoryButtons,
+  CustomerOrdersHistoryDialog,
+} from '@/features/orders/CustomerOrdersHistory'
 import { CustomerEditForm } from '@/features/orders/CustomerEditForm'
+import { EditClientSourceDialog } from '@/features/orders/EditClientSourceDialog'
 import { FormedPrintDialog } from '@/features/orders/FormedPrintDialog'
 import { OrderComments } from '@/features/orders/OrderComments'
 import { OrderElementsTable } from '@/features/orders/OrderElementsTable'
 import { TransportCompanySelect } from '@/features/orders/TransportCompanySelect'
 import { orderStatusLabel, orderStatusVariant, formatRubles } from '@/features/orders/status'
 import { useAuth } from '@/features/auth/AuthContext'
+import type { CustomerOrdersHistoryType } from '@/entities/order/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -83,17 +93,26 @@ function DataRow({
   label,
   children,
   className,
+  id,
 }: {
   label: string
   children: ReactNode
   className?: string
+  id?: string
 }) {
   return (
-    <div className={cn('border-b py-3 last:border-b-0', className)}>
+    <div id={id} className={cn('border-b py-3 last:border-b-0', className)}>
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="mt-0.5 text-sm font-medium">{children}</div>
     </div>
   )
+}
+
+function focusClientSourceField() {
+  document.getElementById('order-client-source')?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'center',
+  })
 }
 
 export function OrderDetailPage() {
@@ -104,8 +123,12 @@ export function OrderDetailPage() {
   const [editingCustomer, setEditingCustomer] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [formedPrintOpen, setFormedPrintOpen] = useState(false)
+  const [clientSourceOpen, setClientSourceOpen] = useState(false)
+  const [reminderOpen, setReminderOpen] = useState(false)
+  const [historyType, setHistoryType] = useState<CustomerOrdersHistoryType | null>(null)
 
   const enabled = Number.isFinite(orderId)
+  const clientSources = user?.manager?.accessibleClientSources ?? []
 
   const orderQuery = useQuery({
     queryKey: ['order', orderId],
@@ -190,6 +213,41 @@ export function OrderDetailPage() {
     },
   })
 
+  const checkElementsMutation = useMutation({
+    mutationFn: async () => {
+      const id = orderQuery.data?.id
+      if (!id) throw new Error('Заказ не загружен')
+      return checkElementsByApi(id)
+    },
+    onSuccess: async (result) => {
+      const empty = result.emptyOrderElementItem ?? []
+      const canceled = result.canceledOrderElementItem ?? []
+
+      if (empty.length > 0) {
+        toast.warning(
+          `Нет в наличии:\n${empty.map((text, i) => `${i + 1}. ${text}`).join('\n')}`,
+        )
+        return
+      }
+
+      if (canceled.length > 0) {
+        toast.warning(
+          `Автоматически отменены:\n${canceled.map((text, i) => `${i + 1}. ${text}`).join('\n')}`,
+        )
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['order-elements', orderId] }),
+          queryClient.invalidateQueries({ queryKey: ['order', orderId] }),
+        ])
+        return
+      }
+
+      toast.success('Все позиции в наличии!')
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Не удалось проверить наличие')
+    },
+  })
+
   const order = orderQuery.data
   const customer = customerQuery.data
   const statusData = statusQuery.data
@@ -255,9 +313,15 @@ export function OrderDetailPage() {
   const showNotify = statusAlias === 'accepted'
   const showReNotify = ['notified_customer', 'confirmed', 'collected'].includes(statusAlias)
 
+  const warnMissingClientSource = () => {
+    toast.warning('Не указан источник обращения')
+    focusClientSourceField()
+    setClientSourceOpen(true)
+  }
+
   const openConfirmDialog = () => {
     if (!order.clientSource) {
-      toast.warning('Не указан источник обращения')
+      warnMissingClientSource()
       return
     }
     setConfirmOpen(true)
@@ -265,7 +329,7 @@ export function OrderDetailPage() {
 
   const handleNotify = () => {
     if (showNotify && !order.clientSource) {
-      toast.warning('Не указан источник обращения')
+      warnMissingClientSource()
       return
     }
     notifyMutation.mutate()
@@ -326,6 +390,19 @@ export function OrderDetailPage() {
               Подтвердить
             </Button>
           ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            disabled={checkElementsMutation.isPending}
+            onClick={() => checkElementsMutation.mutate()}
+          >
+            <RefreshCw className="size-4" />
+            {checkElementsMutation.isPending ? 'Проверка…' : 'Проверить наличие'}
+          </Button>
+          <Button type="button" variant="outline" onClick={() => setReminderOpen(true)}>
+            <Bell className="size-4" />
+            Напоминание
+          </Button>
           <Button type="button" variant="outline" onClick={() => setFormedPrintOpen(true)}>
             <FileText className="size-4" />
             Сформировать счёт
@@ -363,8 +440,19 @@ export function OrderDetailPage() {
                 {paymentLabel(payAmount, payCount)}
               </span>
             </DataRow>
-            <DataRow label="Источник обращения">
-              {order.clientSourceDescription || order.clientSource || '—'}
+            <DataRow id="order-client-source" label="Источник обращения">
+              <div className="flex flex-wrap items-center gap-2">
+                <span>{order.clientSourceDescription || order.clientSource || '—'}</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setClientSourceOpen(true)}
+                >
+                  <Pencil className="size-3.5" />
+                  Изменить
+                </Button>
+              </div>
             </DataRow>
             <DataRow label="Время выполнения">{formatAssemblyTime(order.assemblyTime)}</DataRow>
             <DataRow label="Ответственный">{order.workManager || '—'}</DataRow>
@@ -419,6 +507,7 @@ export function OrderDetailPage() {
               />
             ) : (
               <>
+                <CustomerOrdersHistoryButtons onOpen={setHistoryType} />
                 <DataRow label="ФИО">
                   <span className="inline-flex items-center gap-2">
                     <User className="size-4 text-muted-foreground" />
@@ -538,6 +627,33 @@ export function OrderDetailPage() {
         printHash={order.printHash}
         customerEmail={customerEmail}
         onClose={() => setFormedPrintOpen(false)}
+      />
+
+      <EditClientSourceDialog
+        open={clientSourceOpen}
+        orderId={order.id}
+        currentSource={order.clientSource}
+        sources={clientSources}
+        onClose={() => setClientSourceOpen(false)}
+        onSaved={() => {
+          void queryClient.invalidateQueries({ queryKey: ['order', orderId] })
+        }}
+      />
+
+      <AddReminderDialog
+        open={reminderOpen}
+        orderId={order.id}
+        onClose={() => setReminderOpen(false)}
+        onSaved={() => {
+          void queryClient.invalidateQueries({ queryKey: ['order', orderId] })
+        }}
+      />
+
+      <CustomerOrdersHistoryDialog
+        open={historyType != null}
+        orderId={order.id}
+        type={historyType}
+        onClose={() => setHistoryType(null)}
       />
     </div>
   )

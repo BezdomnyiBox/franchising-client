@@ -6,6 +6,10 @@ export interface FranchiseUser {
   manager?: {
     branchId: number
     branchName?: string
+    accessibleClientSources?: Array<{
+      alias: string
+      description: string
+    }>
   }
   permissions?: {
     pages?: Record<string, Record<string, boolean> | boolean>

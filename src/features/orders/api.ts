@@ -1,6 +1,9 @@
 import { http } from '@/shared/api/http'
 import type {
+  CheckElementsByApiResult,
   CreateFranchisingOrderPayload,
+  CustomerOrderHistoryItem,
+  CustomerOrdersHistoryType,
   Order,
   OrderCustomerFieldData,
   OrderElement,
@@ -435,4 +438,73 @@ export async function sendPrintOrder(orderId: number): Promise<void> {
     )
     await assertChangeSuccess(data)
   }, 'Не удалось отправить счёт')
+}
+
+/** POST /order/{id}/change_client_source — как CRM OrderClientSource. */
+export async function changeOrderClientSource(
+  orderId: number,
+  clientSource: string,
+): Promise<void> {
+  return withApiError(async () => {
+    const { data } = await http.post<{ result?: string; message?: string }>(
+      `/order/${orderId}/change_client_source`,
+      { clientSource },
+    )
+    await assertChangeSuccess(data)
+  }, 'Не удалось сменить источник обращения')
+}
+
+export async function checkElementsByApi(
+  orderId: number,
+): Promise<CheckElementsByApiResult> {
+  return withApiError(async () => {
+    const { data } = await http.post<CheckElementsByApiResult>(
+      `/order/${orderId}/check_elements_by_api`,
+    )
+    return data ?? {}
+  }, 'Не удалось проверить наличие')
+}
+
+export async function confirmOrderElementWeight(elementId: number): Promise<void> {
+  return withApiError(async () => {
+    const { data } = await http.patch<{ result?: string; message?: string }>(
+      `/order_element/${elementId}/confirm_weight`,
+      { value: 1 },
+    )
+    await assertChangeSuccess(data)
+  }, 'Не удалось подтвердить вес')
+}
+
+export async function addOrderNotification(
+  orderId: number,
+  payload: { messageId?: number; showDate: string; comment: string },
+): Promise<void> {
+  return withApiError(async () => {
+    const { data } = await http.post<{
+      result?: string
+      message?: string
+      error?: string
+    }>(`/order/${orderId}/add_notification`, {
+      messageId: payload.messageId ?? 1,
+      showDate: payload.showDate,
+      comment: payload.comment,
+    })
+    if (data && typeof data === 'object' && data.result && data.result !== 'success') {
+      throw new Error(data.error || data.message || 'Не удалось создать напоминание')
+    }
+    await assertChangeSuccess(data)
+  }, 'Не удалось создать напоминание')
+}
+
+export async function fetchCustomerOrdersHistory(
+  orderId: number,
+  type: CustomerOrdersHistoryType,
+): Promise<CustomerOrderHistoryItem[]> {
+  return withApiError(async () => {
+    const { data } = await http.get<CustomerOrderHistoryItem[] | unknown>(
+      `/order/${orderId}/customers_orders`,
+      { params: { type } },
+    )
+    return Array.isArray(data) ? data : []
+  }, 'Не удалось загрузить историю заказов')
 }

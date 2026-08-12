@@ -641,6 +641,142 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /order/{orderId}/change_client_source:
+    post:
+      tags: [Orders]
+      summary: Сменить источник обращения
+      operationId: changeOrderClientSource
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [clientSource]
+              properties:
+                clientSource:
+                  type: string
+                  description: alias из user.manager.accessibleClientSources
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order/{orderId}/check_elements_by_api:
+    post:
+      tags: [Orders]
+      summary: Проверить наличие позиций у поставщиков
+      operationId: checkElementsByApi
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Результат проверки
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  emptyOrderElementItem:
+                    type: array
+                    items: { type: string }
+                  canceledOrderElementItem:
+                    type: array
+                    items: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order/{orderId}/add_notification:
+    post:
+      tags: [Orders]
+      summary: Создать напоминание по заказу
+      operationId: addOrderNotification
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [showDate, comment]
+              properties:
+                messageId:
+                  type: integer
+                  default: 1
+                showDate:
+                  type: string
+                  description: 'YYYY-MM-DD HH:mm:00'
+                comment:
+                  type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order/{orderId}/customers_orders:
+    get:
+      tags: [Orders]
+      summary: История заказов клиента по VIN или телефону
+      operationId: fetchCustomerOrdersHistory
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [vin, phone]
+      responses:
+        '200':
+          description: Список прошлых заказов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CustomerOrderHistoryItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order_element/{elementId}/confirm_weight:
+    patch:
+      tags: [OrderElements]
+      summary: Подтвердить вес позиции
+      operationId: confirmOrderElementWeight
+      parameters:
+        - $ref: '#/components/parameters/OrderElementId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value:
+                  type: integer
+                  enum: [1]
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /bookkeeping/print_cashier_order/{orderId}:
     get:
       tags: [Orders]
@@ -857,6 +993,25 @@ components:
         totalPrice: { type: number }
         workManagerName: { type: string }
         branchId: { type: integer }
+        statusesHistory:
+          type: array
+          items:
+            type: object
+            properties:
+              description: { type: string }
+              date: { type: string }
+              color: { type: string }
+        comments:
+          type: array
+          items:
+            type: object
+            properties:
+              date: { type: string }
+              text: { type: string }
+        refusingReason:
+          oneOf:
+            - { type: string }
+            - { type: 'null' }
 
     Order:
       allOf:
@@ -917,6 +1072,31 @@ components:
         status: { type: string }
         weight: { type: number }
         description: { type: string }
+        isWeightConfirmed: { type: boolean }
+        diffOfferTimeDays: { type: number }
+
+    CustomerOrderHistoryItem:
+      type: object
+      required: [id]
+      properties:
+        id: { type: integer }
+        number:
+          oneOf:
+            - { type: integer }
+            - { type: string }
+        acceptedDate: { type: string }
+        issueDate: { type: string }
+        elements:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              offerBrand: { type: string }
+              offerArt: { type: string }
+              name: { type: string }
+              quantity: { type: number }
+              status: { type: string }
 
     CreateFranchisingOrderRequest:
       type: object

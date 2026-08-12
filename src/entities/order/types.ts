@@ -8,6 +8,19 @@ export type OrderStatus =
   | 'canceled'
   | string
 
+/** История статусов в строке списка (GET /order/list → statusesHistory). */
+export interface OrderListStatusHistoryItem {
+  description: string
+  date: string
+  color?: string
+}
+
+/** Комментарий в строке списка (GET /order/list → comments). */
+export interface OrderListComment {
+  date?: string
+  text?: string
+}
+
 /** Элемент из GET /order/list (поля как в OrderObject::getOrdersList). */
 export interface OrderListItem {
   id: number
@@ -27,6 +40,9 @@ export interface OrderListItem {
   workManagerName?: string
   address?: string
   branchId?: number
+  statusesHistory?: OrderListStatusHistoryItem[]
+  comments?: OrderListComment[]
+  refusingReason?: string | null
 }
 
 /**
@@ -167,7 +183,34 @@ export interface OrderElement {
   /** Флаг подтверждения позиции (влияет на отмену в статусе confirmed). */
   confirmed?: boolean
   isWeightConfirmed?: boolean
+  /** Срок под заказ (дней) — для текста копирования клиенту. */
+  diffOfferTimeDays?: number
   [key: string]: unknown
+}
+
+/** Элемент истории заказов клиента (GET /order/{id}/customers_orders). */
+export interface CustomerOrderHistoryElement {
+  id: number
+  offerBrand?: string
+  offerArt?: string
+  name?: string
+  quantity?: number
+  status?: string
+}
+
+export interface CustomerOrderHistoryItem {
+  id: number
+  number?: number | string
+  acceptedDate?: string
+  issueDate?: string
+  elements?: CustomerOrderHistoryElement[]
+}
+
+export type CustomerOrdersHistoryType = 'vin' | 'phone'
+
+export interface CheckElementsByApiResult {
+  emptyOrderElementItem?: string[]
+  canceledOrderElementItem?: string[]
 }
 
 export interface CreateFranchisingOrderPayload {

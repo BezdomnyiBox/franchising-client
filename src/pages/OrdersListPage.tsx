@@ -1,10 +1,12 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { format, parse } from 'date-fns'
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import { fetchOrdersList } from '@/features/orders/api'
 import { CopyOrderActions } from '@/features/orders/CopyOrderActions'
+import { OrderElementsPopover } from '@/features/orders/OrderElementsPopover'
+import { OrderListRowMeta } from '@/features/orders/OrderListRowMeta'
 import {
   formatOrderListPrice,
   formatRubles,
@@ -65,15 +67,17 @@ type FilterDraft = {
 
 const DEFAULT_SORT_KEY: SortKey = 'createdAt'
 const DEFAULT_SORT_DIR: SortDir = 'desc'
+const PAGE_SIZE_OPTIONS = [50, 150, 300] as const
+const DEFAULT_PAGE_SIZE = 50
 
 /** Фиксированные ширины — одинаковые во всех группах. */
 const COLUMN_WIDTHS: Record<SortKey | 'actions', string> = {
   createdAt: '10%',
-  number: '7%',
+  number: '9%',
   status: '11%',
-  customerFullName: '14%',
+  customerFullName: '13%',
   phone: '11%',
-  fullCar: '14%',
+  fullCar: '13%',
   workManagerName: '12%',
   price: '10%',
   actions: '11%',
@@ -230,121 +234,184 @@ function OrdersGroupTable({
   sortKey,
   sortDir,
   onSort,
+  pageSize,
 }: {
   group: OrdersListGroup
   sortKey: SortKey
   sortDir: SortDir
   onSort: (key: SortKey) => void
+  pageSize: number
 }) {
+  const [page, setPage] = useState(0)
+
   const orders = useMemo(
     () => [...group.orders].sort((a, b) => compareOrders(a, b, sortKey, sortDir)),
     [group.orders, sortKey, sortDir],
   )
 
-  return (
-    <div className="overflow-x-auto">
-      <Table className="table-fixed min-w-[1100px]">
-        <colgroup>
-          {SORT_COLUMNS.map((col) => (
-            <col key={col.key} style={{ width: COLUMN_WIDTHS[col.key] }} />
-          ))}
-          <col style={{ width: COLUMN_WIDTHS.actions }} />
-        </colgroup>
-        <TableHeader>
-          <TableRow>
-            {SORT_COLUMNS.map((col) => (
-              <SortableHead
-                key={col.key}
-                columnKey={col.key}
-                label={col.label}
-                align={col.align}
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={onSort}
-              />
-            ))}
-            <TableHead style={{ width: COLUMN_WIDTHS.actions }} className="text-right">
-              <span className="text-muted-foreground">Копия</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {orders.map((order) => {
-            const publicNumber = order.number ?? orderIdToPublicNumber(order.id)
-            const orderHref = `${APP_BASE_PATH}/orders/${publicNumber}`
-            const phoneLabel = formatPhoneRu(order.phone)
-            const telHref = toTelHref(order.phone)
+  useEffect(() => {
+    setPage(0)
+  }, [group.key, sortKey, sortDir, pageSize, group.orders.length])
 
-            return (
-              <TableRow key={order.id}>
-                <TableCell
-                  style={{ width: COLUMN_WIDTHS.createdAt }}
-                  className="truncate text-muted-foreground"
-                >
-                  {order.createdAt ?? '—'}
-                </TableCell>
-                <TableCell style={{ width: COLUMN_WIDTHS.number }} className="truncate">
-                  <a
-                    href={orderHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-bold text-blue-600 hover:text-blue-800 hover:underline"
+  const pageCount = Math.max(1, Math.ceil(orders.length / pageSize))
+  const safePage = Math.min(page, pageCount - 1)
+  const pageOrders = orders.slice(safePage * pageSize, safePage * pageSize + pageSize)
+
+  return (
+    <div className="space-y-3">
+      <div className="overflow-x-auto">
+        <Table className="table-fixed min-w-[1100px]">
+          <colgroup>
+            {SORT_COLUMNS.map((col) => (
+              <col key={col.key} style={{ width: COLUMN_WIDTHS[col.key] }} />
+            ))}
+            <col style={{ width: COLUMN_WIDTHS.actions }} />
+          </colgroup>
+          <TableHeader>
+            <TableRow>
+              {SORT_COLUMNS.map((col) => (
+                <SortableHead
+                  key={col.key}
+                  columnKey={col.key}
+                  label={col.label}
+                  align={col.align}
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                />
+              ))}
+              <TableHead style={{ width: COLUMN_WIDTHS.actions }} className="text-right">
+                <span className="text-muted-foreground">Копия</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {pageOrders.map((order) => {
+              const publicNumber = order.number ?? orderIdToPublicNumber(order.id)
+              const orderHref = `${APP_BASE_PATH}/orders/${publicNumber}`
+              const phoneLabel = formatPhoneRu(order.phone)
+              const telHref = toTelHref(order.phone)
+
+              return (
+                <TableRow key={order.id}>
+                  <TableCell
+                    style={{ width: COLUMN_WIDTHS.createdAt }}
+                    className="truncate text-muted-foreground"
                   >
-                    {publicNumber}
-                  </a>
-                </TableCell>
-                <TableCell style={{ width: COLUMN_WIDTHS.status }}>
-                  <Badge variant={orderStatusVariant(order.status)} className="max-w-full truncate">
-                    {order.statusDescription ?? orderStatusLabel(order.status)}
-                  </Badge>
-                </TableCell>
-                <TableCell
-                  style={{ width: COLUMN_WIDTHS.customerFullName }}
-                  className="truncate"
-                  title={order.customerFullName || undefined}
-                >
-                  {order.customerFullName || '—'}
-                </TableCell>
-                <TableCell style={{ width: COLUMN_WIDTHS.phone }} className="truncate">
-                  {telHref && phoneLabel ? (
-                    <a
-                      href={telHref}
-                      className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                    {order.createdAt ?? '—'}
+                  </TableCell>
+                  <TableCell style={{ width: COLUMN_WIDTHS.number }}>
+                    <div className="flex items-center gap-0.5">
+                      <a
+                        href={orderHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="truncate font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {publicNumber}
+                      </a>
+                      <OrderElementsPopover orderId={order.id} />
+                      <OrderListRowMeta
+                        variant="number"
+                        statusesHistory={order.statusesHistory}
+                      />
+                    </div>
+                  </TableCell>
+                  <TableCell style={{ width: COLUMN_WIDTHS.status }}>
+                    <Badge
+                      variant={orderStatusVariant(order.status)}
+                      className="max-w-full truncate"
                     >
-                      {phoneLabel}
-                    </a>
-                  ) : (
-                    '—'
-                  )}
-                </TableCell>
-                <TableCell
-                  style={{ width: COLUMN_WIDTHS.fullCar }}
-                  className="truncate"
-                  title={order.fullCar || undefined}
-                >
-                  {order.fullCar || '—'}
-                </TableCell>
-                <TableCell
-                  style={{ width: COLUMN_WIDTHS.workManagerName }}
-                  className="truncate"
-                  title={order.workManagerName || undefined}
-                >
-                  {order.workManagerName || '—'}
-                </TableCell>
-                <TableCell
-                  style={{ width: COLUMN_WIDTHS.price }}
-                  className="text-right tabular-nums"
-                >
-                  {formatOrderListPrice(order.price)}
-                </TableCell>
-                <TableCell style={{ width: COLUMN_WIDTHS.actions }}>
-                  <CopyOrderActions orderId={order.id} />
-                </TableCell>
-              </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
+                      {order.statusDescription ?? orderStatusLabel(order.status)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell
+                    style={{ width: COLUMN_WIDTHS.customerFullName }}
+                    className="truncate"
+                    title={order.customerFullName || undefined}
+                  >
+                    {order.customerFullName || '—'}
+                  </TableCell>
+                  <TableCell style={{ width: COLUMN_WIDTHS.phone }} className="truncate">
+                    {telHref && phoneLabel ? (
+                      <a
+                        href={telHref}
+                        className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {phoneLabel}
+                      </a>
+                    ) : (
+                      '—'
+                    )}
+                  </TableCell>
+                  <TableCell
+                    style={{ width: COLUMN_WIDTHS.fullCar }}
+                    className="truncate"
+                    title={order.fullCar || undefined}
+                  >
+                    {order.fullCar || '—'}
+                  </TableCell>
+                  <TableCell style={{ width: COLUMN_WIDTHS.workManagerName }}>
+                    <div className="flex items-center gap-0.5">
+                      <span className="truncate" title={order.workManagerName || undefined}>
+                        {order.workManagerName || '—'}
+                      </span>
+                      <OrderListRowMeta
+                        variant="manager"
+                        comments={order.comments}
+                        refusingReason={order.refusingReason}
+                      />
+                    </div>
+                  </TableCell>
+                  <TableCell
+                    style={{ width: COLUMN_WIDTHS.price }}
+                    className="text-right tabular-nums"
+                  >
+                    {formatOrderListPrice(order.price)}
+                  </TableCell>
+                  <TableCell style={{ width: COLUMN_WIDTHS.actions }}>
+                    <CopyOrderActions orderId={order.id} />
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
+      </div>
+
+      {orders.length > PAGE_SIZE_OPTIONS[0] || pageCount > 1 ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span className="text-muted-foreground">
+            {orders.length === 0
+              ? '0'
+              : `${safePage * pageSize + 1}–${Math.min((safePage + 1) * pageSize, orders.length)}`}{' '}
+            из {orders.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={safePage <= 0}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+            >
+              Назад
+            </Button>
+            <span className="tabular-nums text-muted-foreground">
+              {safePage + 1} / {pageCount}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={safePage >= pageCount - 1}
+              onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+            >
+              Вперёд
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -354,6 +421,7 @@ export function OrdersListPage() {
   const [applied, setApplied] = useState<FilterDraft>(() => emptyFilters())
   const [sortKey, setSortKey] = useState<SortKey>(DEFAULT_SORT_KEY)
   const [sortDir, setSortDir] = useState<SortDir>(DEFAULT_SORT_DIR)
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE)
 
   const query = useQuery({
     queryKey: ['orders', applied],
@@ -425,6 +493,27 @@ export function OrdersListPage() {
   } else {
     listContent = (
       <>
+        <div className="flex flex-wrap items-center justify-end gap-2 text-sm">
+          <Label htmlFor="page-size" className="text-muted-foreground">
+            На странице
+          </Label>
+          <Select
+            value={String(pageSize)}
+            onValueChange={(value) => setPageSize(Number(value) || DEFAULT_PAGE_SIZE)}
+          >
+            <SelectTrigger id="page-size" className="w-24">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <SelectItem key={size} value={String(size)}>
+                  {size}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {groups.map((group) => (
           <Card key={group.key}>
             <CardHeader className="pb-3">
@@ -453,6 +542,7 @@ export function OrdersListPage() {
                 sortKey={sortKey}
                 sortDir={sortDir}
                 onSort={handleSort}
+                pageSize={pageSize}
               />
             </CardContent>
           </Card>
