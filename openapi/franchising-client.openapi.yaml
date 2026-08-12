@@ -263,16 +263,16 @@ paths:
       operationId: addOrderElement
       description: |
         Как в CRM SearchContainer.addItemToOrder.
+        Пустая строка (FR-S1-02 / ElementsList.addElement): тело без itemId.
         Сервер обязан проверить, что order принадлежит ПВ менеджера.
       parameters:
         - $ref: '#/components/parameters/OrderId'
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
               type: object
-              required: [itemId]
               properties:
                 itemId: { type: integer }
                 quantity: { type: number, default: 1 }
@@ -285,6 +285,15 @@ paths:
                   items: {}
                 is_margin: { type: boolean, default: false }
                 lineNumber: { type: integer, default: 0 }
+            examples:
+              withOffer:
+                summary: Добавление оффера из поиска
+                value:
+                  itemId: 123
+                  quantity: 1
+              blankRow:
+                summary: Пустая строка позиции
+                value: {}
       responses:
         '200':
           description: OK
@@ -309,6 +318,124 @@ paths:
       operationId: confirmOrder
       parameters:
         - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assemblyTime]
+              properties:
+                assemblyTime:
+                  type: string
+                  description: 'YYYY-MM-DD HH:mm:ss'
+                  example: '2026-08-12 18:00:00'
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order_element/{elementId}/cancel:
+    post:
+      tags: [OrderElements]
+      summary: Отменить позицию заказа
+      operationId: cancelOrderElement
+      parameters:
+        - $ref: '#/components/parameters/OrderElementId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result: { type: string }
+                  message: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order_element/{elementId}/quantity:
+    patch:
+      tags: [OrderElements]
+      summary: Изменить количество позиции
+      operationId: patchOrderElementQuantity
+      parameters:
+        - $ref: '#/components/parameters/OrderElementId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderElementValueNumber'
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order_element/{elementId}/retail_price_by_admin:
+    patch:
+      tags: [OrderElements]
+      summary: Изменить розничную цену (рубли)
+      operationId: patchOrderElementRetailPrice
+      parameters:
+        - $ref: '#/components/parameters/OrderElementId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderElementValueNumber'
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order_element/{elementId}/description:
+    patch:
+      tags: [OrderElements]
+      summary: Изменить наименование позиции
+      operationId: patchOrderElementDescription
+      parameters:
+        - $ref: '#/components/parameters/OrderElementId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderElementValueString'
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order_element/{elementId}/weight:
+    patch:
+      tags: [OrderElements]
+      summary: Изменить вес позиции
+      operationId: patchOrderElementWeight
+      parameters:
+        - $ref: '#/components/parameters/OrderElementId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderElementValueNumber'
       responses:
         '200':
           description: OK
@@ -421,6 +548,13 @@ components:
         Сервер обязан проверить принадлежность заказа ПВ текущего менеджера.
       schema:
         type: integer
+    OrderElementId:
+      name: elementId
+      in: path
+      required: true
+      description: Internal id позиции заказа (order_element).
+      schema:
+        type: integer
     From:
       name: from
       in: query
@@ -445,6 +579,16 @@ components:
       description: Ошибка валидации
 
   schemas:
+    OrderElementValueNumber:
+      type: object
+      required: [value]
+      properties:
+        value: { type: number }
+    OrderElementValueString:
+      type: object
+      required: [value]
+      properties:
+        value: { type: string }
     FranchiseUser:
       type: object
       required: [id, roles, manager]

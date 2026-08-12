@@ -10,6 +10,7 @@ import type {
   OrdersListGroup,
   OrderStatusFieldData,
 } from '@/entities/order/types'
+import axios from 'axios'
 
 function assertOrderPayload(data: unknown, orderId: number): Order {
   if (Array.isArray(data) || !data || typeof data !== 'object') {
@@ -185,8 +186,85 @@ export async function addOrderElement(
   return data
 }
 
-export async function confirmOrder(orderId: number): Promise<void> {
-  await http.post(`/order/${orderId}/confirm`)
+/** Пустая строка позиции — POST без itemId (как CRM ElementsList.addElement). */
+export async function addBlankOrderElement(orderId: number): Promise<AddOrderElementResult> {
+  return withApiError(async () => {
+    const { data } = await http.post<AddOrderElementResult>(`/order/${orderId}/add_element`, {})
+    await assertChangeSuccess(data)
+    return data
+  }, 'Не удалось добавить строку')
+}
+
+export async function cancelOrderElement(elementId: number): Promise<void> {
+  return withApiError(async () => {
+    const { data } = await http.post<{ result?: string; message?: string }>(
+      `/order_element/${elementId}/cancel`,
+    )
+    await assertChangeSuccess(data)
+  }, 'Не удалось отменить позицию')
+}
+
+export async function patchOrderElementQuantity(
+  elementId: number,
+  value: number,
+): Promise<void> {
+  return withApiError(async () => {
+    const { data } = await http.patch<{ result?: string; message?: string }>(
+      `/order_element/${elementId}/quantity`,
+      { value },
+    )
+    await assertChangeSuccess(data)
+  }, 'Не удалось изменить количество')
+}
+
+/** Цена в рублях (как CRM retail_price_by_admin). */
+export async function patchOrderElementRetailPrice(
+  elementId: number,
+  value: number,
+): Promise<void> {
+  return withApiError(async () => {
+    const { data } = await http.patch<{ result?: string; message?: string }>(
+      `/order_element/${elementId}/retail_price_by_admin`,
+      { value },
+    )
+    await assertChangeSuccess(data)
+  }, 'Не удалось изменить цену')
+}
+
+export async function patchOrderElementDescription(
+  elementId: number,
+  value: string,
+): Promise<void> {
+  return withApiError(async () => {
+    const { data } = await http.patch<{ result?: string; message?: string }>(
+      `/order_element/${elementId}/description`,
+      { value },
+    )
+    await assertChangeSuccess(data)
+  }, 'Не удалось изменить наименование')
+}
+
+export async function patchOrderElementWeight(
+  elementId: number,
+  value: number,
+): Promise<void> {
+  return withApiError(async () => {
+    const { data } = await http.patch<{ result?: string; message?: string }>(
+      `/order_element/${elementId}/weight`,
+      { value },
+    )
+    await assertChangeSuccess(data)
+  }, 'Не удалось изменить вес')
+}
+
+export async function confirmOrder(orderId: number, assemblyTime: string): Promise<void> {
+  return withApiError(async () => {
+    const { data } = await http.post<{ result?: string; message?: string }>(
+      `/order/${orderId}/confirm`,
+      { assemblyTime },
+    )
+    await assertChangeSuccess(data)
+  }, 'Не удалось подтвердить заказ')
 }
 
 export async function copyOrder(orderId: number): Promise<{ orderId?: number }> {
@@ -199,6 +277,23 @@ async function assertChangeSuccess(data: { result?: string; message?: string } |
     throw new Error(
       (data as { message?: string }).message || 'Не удалось сохранить изменения',
     )
+  }
+}
+
+function rethrowApiError(err: unknown, fallback: string): never {
+  if (axios.isAxiosError(err)) {
+    const data = err.response?.data as { message?: string; error?: string } | undefined
+    throw new Error(data?.message || data?.error || err.message || fallback)
+  }
+  if (err instanceof Error) throw err
+  throw new Error(fallback)
+}
+
+async function withApiError<T>(fn: () => Promise<T>, fallback: string): Promise<T> {
+  try {
+    return await fn()
+  } catch (err) {
+    rethrowApiError(err, fallback)
   }
 }
 

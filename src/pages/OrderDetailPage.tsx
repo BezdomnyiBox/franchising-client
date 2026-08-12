@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from 'react'
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import {
+  CheckCircle,
   ExternalLink,
   Mail,
   Pencil,
@@ -12,13 +13,16 @@ import {
   Car,
   MapPin,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import {
+  confirmOrder,
   fetchOrder,
   fetchOrderCustomer,
   fetchOrderElements,
   fetchOrderPayments,
   fetchOrderStatus,
 } from '@/features/orders/api'
+import { ConfirmOrderDialog } from '@/features/orders/ConfirmOrderDialog'
 import { CustomerEditForm } from '@/features/orders/CustomerEditForm'
 import { OrderElementsTable } from '@/features/orders/OrderElementsTable'
 import { orderStatusLabel, orderStatusVariant, formatRubles } from '@/features/orders/status'
@@ -30,6 +34,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { publicNumberToOrderId } from '@/shared/config'
 import { formatPhoneRu, toTelHref } from '@/shared/phone'
 import { cn } from '@/lib/utils'
+
+/** Как в CRM ActionButtons: accepted / notified_customer / confirmed без флага confirmed. */
+function canConfirmOrder(status?: string, confirmed?: unknown): boolean {
+  if (['accepted', 'notified_customer'].includes(status ?? '')) return true
+  return status === 'confirmed' && !confirmed
+}
 
 function formatCreatedAt(value?: string | null): string {
   if (!value) return '—'
@@ -83,6 +93,7 @@ export function OrderDetailPage() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const [editingCustomer, setEditingCustomer] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const enabled = Number.isFinite(orderId)
 
@@ -118,6 +129,27 @@ export function OrderDetailPage() {
     queryKey: ['order-elements', orderId],
     queryFn: () => fetchOrderElements(orderId),
     enabled: enabled && !!orderQuery.data?.id,
+  })
+
+  const confirmMutation = useMutation({
+    mutationFn: (assemblyTime: string) => {
+      const id = orderQuery.data?.id
+      if (!id) throw new Error('Заказ не загружен')
+      return confirmOrder(id, assemblyTime)
+    },
+    onSuccess: async () => {
+      toast.success('Заказ подтверждён')
+      setConfirmOpen(false)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['order', orderId] }),
+        queryClient.invalidateQueries({ queryKey: ['order-elements', orderId] }),
+        queryClient.invalidateQueries({ queryKey: ['order-status', orderId] }),
+        queryClient.invalidateQueries({ queryKey: ['order-payments', orderId] }),
+      ])
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Не удалось подтвердить заказ')
+    },
   })
 
   const order = orderQuery.data
@@ -176,6 +208,18 @@ export function OrderDetailPage() {
     void queryClient.invalidateQueries({ queryKey: ['order', orderId] })
   }
 
+  const showConfirm =
+    canConfirmOrder(statusData?.status || order.status, order.confirmed) &&
+    !(customer?.isInBlackList && !order.paymentsCount)
+
+  const openConfirmDialog = () => {
+    if (!order.clientSource) {
+      toast.warning('Не указан источник обращения')
+      return
+    }
+    setConfirmOpen(true)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -203,6 +247,17 @@ export function OrderDetailPage() {
                 <ExternalLink className="size-4" />
                 Публичная ссылка
               </a>
+            </Button>
+          ) : null}
+          {showConfirm ? (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={confirmMutation.isPending}
+              onClick={openConfirmDialog}
+            >
+              <CheckCircle className="size-4" />
+              Подтвердить
             </Button>
           ) : null}
           <Button asChild>
@@ -377,6 +432,16 @@ export function OrderDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmOrderDialog
+        open={confirmOpen}
+        defaultAssemblyTime={order.assemblyTime}
+        saving={confirmMutation.isPending}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={async (assemblyTime) => {
+          await confirmMutation.mutateAsync(assemblyTime)
+        }}
+      />
     </div>
   )
 }

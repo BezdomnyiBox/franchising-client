@@ -145,6 +145,9 @@ export interface OrderElement {
   weight?: number
   itemId?: number | null
   item?: OrderElementItem | null
+  /** Флаг подтверждения позиции (влияет на отмену в статусе confirmed). */
+  confirmed?: boolean
+  isWeightConfirmed?: boolean
   [key: string]: unknown
 }
 
