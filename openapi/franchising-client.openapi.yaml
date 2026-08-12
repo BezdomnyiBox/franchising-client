@@ -451,16 +451,33 @@ paths:
       operationId: copyOrder
       parameters:
         - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [withElements, isManagerSource]
+              properties:
+                withElements:
+                  type: boolean
+                  description: Копировать позиции заказа
+                isManagerSource:
+                  type: boolean
+                  description: Источник — менеджер (всегда true для CRM/франшизы)
+                  enum: [true]
       responses:
         '200':
-          description: OK
+          description: OK — orderId = публичный номер нового заказа
           content:
             application/json:
               schema:
                 type: object
+                required: [orderId]
                 properties:
                   orderId:
                     type: integer
+                    description: Публичный номер нового заказа (getNumber)
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -633,11 +650,19 @@ components:
             - { type: string }
         status:
           $ref: '#/components/schemas/OrderStatus'
+        statusDescription: { type: string }
         createdAt: { type: string }
+        createdDate: { type: string }
+        customerFullName: { type: string }
         customerName: { type: string }
         phone: { type: string }
+        fullCar: { type: string }
         car: { type: string }
+        price:
+          type: number
+          description: Сумма в копейках
         totalPrice: { type: number }
+        workManagerName: { type: string }
         branchId: { type: integer }
 
     Order:

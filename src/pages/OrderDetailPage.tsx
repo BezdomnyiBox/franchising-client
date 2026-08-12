@@ -23,6 +23,7 @@ import {
   fetchOrderStatus,
 } from '@/features/orders/api'
 import { ConfirmOrderDialog } from '@/features/orders/ConfirmOrderDialog'
+import { CopyOrderActions } from '@/features/orders/CopyOrderActions'
 import { CustomerEditForm } from '@/features/orders/CustomerEditForm'
 import { OrderElementsTable } from '@/features/orders/OrderElementsTable'
 import { orderStatusLabel, orderStatusVariant, formatRubles } from '@/features/orders/status'
@@ -260,6 +261,7 @@ export function OrderDetailPage() {
               Подтвердить
             </Button>
           ) : null}
+          <CopyOrderActions orderId={order.id} variant="button" />
           <Button asChild>
             <Link to={`/search?orderNumber=${displayNumber}`}>
               <Search className="size-4" />

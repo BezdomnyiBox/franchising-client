@@ -99,14 +99,25 @@ function parseOrdersListGroups(
     .filter((group) => group.orders.length > 0)
 }
 
+/** Пустые значения не уходят в query (как CRM getQuery). */
+function serializeOrdersListParams(
+  filters: OrdersListFilters,
+): Record<string, string | number> {
+  const params: Record<string, string | number> = { withoutInnerOrders: 1 }
+  for (const [key, value] of Object.entries(filters)) {
+    if (value === undefined || value === null) continue
+    const trimmed = String(value).trim()
+    if (!trimmed) continue
+    params[key] = trimmed
+  }
+  return params
+}
+
 export async function fetchOrdersList(
   filters: OrdersListFilters = {},
 ): Promise<OrdersListGroup[]> {
   const { data } = await http.get<LegacyOrdersListResponse | OrderListItem[]>('/order/list', {
-    params: {
-      withoutInnerOrders: 1,
-      ...filters,
-    },
+    params: serializeOrdersListParams(filters),
   })
   return parseOrdersListGroups(data)
 }
@@ -267,9 +278,21 @@ export async function confirmOrder(orderId: number, assemblyTime: string): Promi
   }, 'Не удалось подтвердить заказ')
 }
 
-export async function copyOrder(orderId: number): Promise<{ orderId?: number }> {
-  const { data } = await http.post<{ orderId?: number }>(`/order/copy/${orderId}`)
-  return data
+export async function copyOrder(
+  orderId: number,
+  options: { withElements: boolean },
+): Promise<{ orderId: number }> {
+  return withApiError(async () => {
+    const { data } = await http.post<{ orderId?: number; result?: string; message?: string }>(
+      `/order/copy/${orderId}`,
+      { withElements: options.withElements, isManagerSource: true },
+    )
+    await assertChangeSuccess(data)
+    if (!data?.orderId) {
+      throw new Error('Не удалось скопировать заказ')
+    }
+    return { orderId: data.orderId }
+  }, 'Не удалось скопировать заказ')
 }
 
 async function assertChangeSuccess(data: { result?: string; message?: string } | unknown) {

@@ -4,19 +4,28 @@ import { Link } from 'react-router-dom'
 import { format, parse } from 'date-fns'
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import { fetchOrdersList } from '@/features/orders/api'
+import { CopyOrderActions } from '@/features/orders/CopyOrderActions'
 import {
   formatOrderListPrice,
   formatRubles,
+  ORDER_STATUS_FILTER_OPTIONS,
   orderListStageLabel,
   orderStatusLabel,
   orderStatusVariant,
 } from '@/features/orders/status'
-import type { OrderListItem, OrdersListGroup } from '@/entities/order/types'
+import type { OrderListItem, OrdersListFilters, OrdersListGroup } from '@/entities/order/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -37,22 +46,37 @@ type SortKey =
   | 'customerFullName'
   | 'phone'
   | 'fullCar'
+  | 'workManagerName'
   | 'price'
 
 type SortDir = 'asc' | 'desc'
+
+type FilterDraft = {
+  from: string
+  to: string
+  phone: string
+  article: string
+  car: string
+  customer: string
+  status: string
+  priceFrom: string
+  priceTo: string
+}
 
 const DEFAULT_SORT_KEY: SortKey = 'createdAt'
 const DEFAULT_SORT_DIR: SortDir = 'desc'
 
 /** Фиксированные ширины — одинаковые во всех группах. */
-const COLUMN_WIDTHS: Record<SortKey, string> = {
-  createdAt: '12%',
-  number: '9%',
-  status: '14%',
-  customerFullName: '18%',
-  phone: '14%',
-  fullCar: '19%',
-  price: '14%',
+const COLUMN_WIDTHS: Record<SortKey | 'actions', string> = {
+  createdAt: '10%',
+  number: '7%',
+  status: '11%',
+  customerFullName: '14%',
+  phone: '11%',
+  fullCar: '14%',
+  workManagerName: '12%',
+  price: '10%',
+  actions: '11%',
 }
 
 const SORT_COLUMNS: { key: SortKey; label: string; align?: 'right' }[] = [
@@ -62,11 +86,40 @@ const SORT_COLUMNS: { key: SortKey; label: string; align?: 'right' }[] = [
   { key: 'customerFullName', label: 'Клиент' },
   { key: 'phone', label: 'Телефон' },
   { key: 'fullCar', label: 'Авто' },
+  { key: 'workManagerName', label: 'Менеджер' },
   { key: 'price', label: 'Сумма', align: 'right' },
 ]
 
 function todayIso() {
   return format(new Date(), 'yyyy-MM-dd')
+}
+
+function emptyFilters(from = todayIso(), to = todayIso()): FilterDraft {
+  return {
+    from,
+    to,
+    phone: '',
+    article: '',
+    car: '',
+    customer: '',
+    status: '',
+    priceFrom: '',
+    priceTo: '',
+  }
+}
+
+function toListFilters(draft: FilterDraft): OrdersListFilters {
+  return {
+    from: draft.from,
+    to: draft.to,
+    phone: draft.phone || undefined,
+    article: draft.article || undefined,
+    car: draft.car || undefined,
+    customer: draft.customer || undefined,
+    status: draft.status || undefined,
+    priceFrom: draft.priceFrom || undefined,
+    priceTo: draft.priceTo || undefined,
+  }
 }
 
 function parseOrderCreatedAt(order: OrderListItem): number {
@@ -112,6 +165,12 @@ function compareOrders(a: OrderListItem, b: OrderListItem, key: SortKey, dir: So
     case 'fullCar': {
       const as = (a.fullCar ?? '').toLocaleLowerCase('ru')
       const bs = (b.fullCar ?? '').toLocaleLowerCase('ru')
+      result = as.localeCompare(bs, 'ru')
+      break
+    }
+    case 'workManagerName': {
+      const as = (a.workManagerName ?? '').toLocaleLowerCase('ru')
+      const bs = (b.workManagerName ?? '').toLocaleLowerCase('ru')
       result = as.localeCompare(bs, 'ru')
       break
     }
@@ -183,115 +242,122 @@ function OrdersGroupTable({
   )
 
   return (
-    <Table className="table-fixed min-w-[960px]">
-      <colgroup>
-        {SORT_COLUMNS.map((col) => (
-          <col key={col.key} style={{ width: COLUMN_WIDTHS[col.key] }} />
-        ))}
-      </colgroup>
-      <TableHeader>
-        <TableRow>
+    <div className="overflow-x-auto">
+      <Table className="table-fixed min-w-[1100px]">
+        <colgroup>
           {SORT_COLUMNS.map((col) => (
-            <SortableHead
-              key={col.key}
-              columnKey={col.key}
-              label={col.label}
-              align={col.align}
-              sortKey={sortKey}
-              sortDir={sortDir}
-              onSort={onSort}
-            />
+            <col key={col.key} style={{ width: COLUMN_WIDTHS[col.key] }} />
           ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {orders.map((order) => {
-          const publicNumber = order.number ?? orderIdToPublicNumber(order.id)
-          const orderHref = `${APP_BASE_PATH}/orders/${publicNumber}`
-          const phoneLabel = formatPhoneRu(order.phone)
-          const telHref = toTelHref(order.phone)
+          <col style={{ width: COLUMN_WIDTHS.actions }} />
+        </colgroup>
+        <TableHeader>
+          <TableRow>
+            {SORT_COLUMNS.map((col) => (
+              <SortableHead
+                key={col.key}
+                columnKey={col.key}
+                label={col.label}
+                align={col.align}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={onSort}
+              />
+            ))}
+            <TableHead style={{ width: COLUMN_WIDTHS.actions }} className="text-right">
+              <span className="text-muted-foreground">Копия</span>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {orders.map((order) => {
+            const publicNumber = order.number ?? orderIdToPublicNumber(order.id)
+            const orderHref = `${APP_BASE_PATH}/orders/${publicNumber}`
+            const phoneLabel = formatPhoneRu(order.phone)
+            const telHref = toTelHref(order.phone)
 
-          return (
-            <TableRow key={order.id}>
-              <TableCell
-                style={{ width: COLUMN_WIDTHS.createdAt }}
-                className="truncate text-muted-foreground"
-              >
-                {order.createdAt ?? '—'}
-              </TableCell>
-              <TableCell style={{ width: COLUMN_WIDTHS.number }} className="truncate">
-                <a
-                  href={orderHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-bold text-blue-600 hover:text-blue-800 hover:underline"
+            return (
+              <TableRow key={order.id}>
+                <TableCell
+                  style={{ width: COLUMN_WIDTHS.createdAt }}
+                  className="truncate text-muted-foreground"
                 >
-                  {publicNumber}
-                </a>
-              </TableCell>
-              <TableCell style={{ width: COLUMN_WIDTHS.status }}>
-                <Badge variant={orderStatusVariant(order.status)} className="max-w-full truncate">
-                  {order.statusDescription ?? orderStatusLabel(order.status)}
-                </Badge>
-              </TableCell>
-              <TableCell
-                style={{ width: COLUMN_WIDTHS.customerFullName }}
-                className="truncate"
-                title={order.customerFullName || undefined}
-              >
-                {order.customerFullName || '—'}
-              </TableCell>
-              <TableCell style={{ width: COLUMN_WIDTHS.phone }} className="truncate">
-                {telHref && phoneLabel ? (
+                  {order.createdAt ?? '—'}
+                </TableCell>
+                <TableCell style={{ width: COLUMN_WIDTHS.number }} className="truncate">
                   <a
-                    href={telHref}
-                    className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                    href={orderHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold text-blue-600 hover:text-blue-800 hover:underline"
                   >
-                    {phoneLabel}
+                    {publicNumber}
                   </a>
-                ) : (
-                  '—'
-                )}
-              </TableCell>
-              <TableCell
-                style={{ width: COLUMN_WIDTHS.fullCar }}
-                className="truncate"
-                title={order.fullCar || undefined}
-              >
-                {order.fullCar || '—'}
-              </TableCell>
-              <TableCell
-                style={{ width: COLUMN_WIDTHS.price }}
-                className="text-right tabular-nums"
-              >
-                {formatOrderListPrice(order.price)}
-              </TableCell>
-            </TableRow>
-          )
-        })}
-      </TableBody>
-    </Table>
+                </TableCell>
+                <TableCell style={{ width: COLUMN_WIDTHS.status }}>
+                  <Badge variant={orderStatusVariant(order.status)} className="max-w-full truncate">
+                    {order.statusDescription ?? orderStatusLabel(order.status)}
+                  </Badge>
+                </TableCell>
+                <TableCell
+                  style={{ width: COLUMN_WIDTHS.customerFullName }}
+                  className="truncate"
+                  title={order.customerFullName || undefined}
+                >
+                  {order.customerFullName || '—'}
+                </TableCell>
+                <TableCell style={{ width: COLUMN_WIDTHS.phone }} className="truncate">
+                  {telHref && phoneLabel ? (
+                    <a
+                      href={telHref}
+                      className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      {phoneLabel}
+                    </a>
+                  ) : (
+                    '—'
+                  )}
+                </TableCell>
+                <TableCell
+                  style={{ width: COLUMN_WIDTHS.fullCar }}
+                  className="truncate"
+                  title={order.fullCar || undefined}
+                >
+                  {order.fullCar || '—'}
+                </TableCell>
+                <TableCell
+                  style={{ width: COLUMN_WIDTHS.workManagerName }}
+                  className="truncate"
+                  title={order.workManagerName || undefined}
+                >
+                  {order.workManagerName || '—'}
+                </TableCell>
+                <TableCell
+                  style={{ width: COLUMN_WIDTHS.price }}
+                  className="text-right tabular-nums"
+                >
+                  {formatOrderListPrice(order.price)}
+                </TableCell>
+                <TableCell style={{ width: COLUMN_WIDTHS.actions }}>
+                  <CopyOrderActions orderId={order.id} />
+                </TableCell>
+              </TableRow>
+            )
+          })}
+        </TableBody>
+      </Table>
+    </div>
   )
 }
 
 export function OrdersListPage() {
-  const [from, setFrom] = useState(todayIso)
-  const [to, setTo] = useState(todayIso)
-  const [phone, setPhone] = useState('')
-  const [article, setArticle] = useState('')
-  const [applied, setApplied] = useState({ from: todayIso(), to: todayIso(), phone: '', article: '' })
+  const [draft, setDraft] = useState<FilterDraft>(() => emptyFilters())
+  const [applied, setApplied] = useState<FilterDraft>(() => emptyFilters())
   const [sortKey, setSortKey] = useState<SortKey>(DEFAULT_SORT_KEY)
   const [sortDir, setSortDir] = useState<SortDir>(DEFAULT_SORT_DIR)
 
   const query = useQuery({
     queryKey: ['orders', applied],
-    queryFn: () =>
-      fetchOrdersList({
-        from: applied.from,
-        to: applied.to,
-        phone: applied.phone || undefined,
-        article: applied.article || undefined,
-      }),
+    queryFn: () => fetchOrdersList(toListFilters(applied)),
   })
 
   const groups = useMemo(() => query.data ?? [], [query.data])
@@ -315,6 +381,16 @@ export function OrdersListPage() {
     }
     setSortKey(key)
     setSortDir(key === 'createdAt' || key === 'price' || key === 'number' ? 'desc' : 'asc')
+  }
+
+  const patchDraft = (patch: Partial<FilterDraft>) => {
+    setDraft((prev) => ({ ...prev, ...patch }))
+  }
+
+  const handleClearAll = () => {
+    const cleaned = emptyFilters()
+    setDraft(cleaned)
+    setApplied(cleaned)
   }
 
   let listContent: ReactNode
@@ -420,22 +496,82 @@ export function OrdersListPage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Фильтры</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
           <div className="space-y-1.5">
             <Label htmlFor="from">С</Label>
-            <Input id="from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <Input
+              id="from"
+              type="date"
+              value={draft.from}
+              onChange={(e) => patchDraft({ from: e.target.value })}
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="to">По</Label>
-            <Input id="to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            <Input
+              id="to"
+              type="date"
+              value={draft.to}
+              onChange={(e) => patchDraft({ to: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="status">Статус</Label>
+            <Select
+              value={draft.status || '__all__'}
+              onValueChange={(value) =>
+                patchDraft({ status: !value || value === '__all__' ? '' : value })
+              }
+            >
+              <SelectTrigger id="status" className="w-full">
+                <SelectValue placeholder="Все" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Все</SelectItem>
+                {ORDER_STATUS_FILTER_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="priceFrom">Сумма от</Label>
+            <Input
+              id="priceFrom"
+              inputMode="decimal"
+              placeholder="0"
+              value={draft.priceFrom}
+              onChange={(e) => patchDraft({ priceFrom: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="priceTo">Сумма до</Label>
+            <Input
+              id="priceTo"
+              inputMode="decimal"
+              placeholder="0"
+              value={draft.priceTo}
+              onChange={(e) => patchDraft({ priceTo: e.target.value })}
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="phone">Телефон</Label>
             <Input
               id="phone"
               placeholder="9xxxxxxxxx"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              value={draft.phone}
+              onChange={(e) => patchDraft({ phone: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="car">Авто</Label>
+            <Input
+              id="car"
+              placeholder="марка / модель / VIN"
+              value={draft.car}
+              onChange={(e) => patchDraft({ car: e.target.value })}
             />
           </div>
           <div className="space-y-1.5">
@@ -443,16 +579,25 @@ export function OrdersListPage() {
             <Input
               id="article"
               placeholder="OEM / артикул"
-              value={article}
-              onChange={(e) => setArticle(e.target.value)}
+              value={draft.article}
+              onChange={(e) => patchDraft({ article: e.target.value })}
             />
           </div>
-          <div className="flex items-end">
-            <Button
-              className="w-full"
-              onClick={() => setApplied({ from, to, phone, article })}
-            >
+          <div className="space-y-1.5">
+            <Label htmlFor="customer">Клиент</Label>
+            <Input
+              id="customer"
+              placeholder="ФИО"
+              value={draft.customer}
+              onChange={(e) => patchDraft({ customer: e.target.value })}
+            />
+          </div>
+          <div className="flex flex-wrap items-end gap-2 sm:col-span-2 lg:col-span-4 xl:col-span-1">
+            <Button className="flex-1" onClick={() => setApplied({ ...draft })}>
               Найти
+            </Button>
+            <Button className="flex-1" variant="outline" onClick={handleClearAll}>
+              Сбросить
             </Button>
           </div>
         </CardContent>

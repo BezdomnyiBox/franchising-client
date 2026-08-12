@@ -11,6 +11,17 @@ const LABELS: Record<string, string> = {
   canceled: 'Отменен',
 }
 
+/** Опции фильтра статуса списка (как CRM StatusSelect). */
+export const ORDER_STATUS_FILTER_OPTIONS: { value: string; label: string }[] = [
+  { value: 'accepted', label: LABELS.accepted },
+  { value: 'confirmed', label: LABELS.confirmed },
+  { value: 'notified_customer', label: LABELS.notified_customer },
+  { value: 'canceled', label: LABELS.canceled },
+  { value: 'collected', label: LABELS.collected },
+  { value: 'issued', label: LABELS.issued },
+  { value: 'packed', label: LABELS.packed },
+]
+
 /**
  * Подписи стадий списка (Order::ORDERS_LIST_DESCRIPTIONS).
  * Порядок стадий на бэке: accepted → notified_customer → confirmed → collected → packed → issued → canceled.
