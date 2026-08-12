@@ -80,15 +80,20 @@ export async function fetchProductTips(params: SearchTipsParams): Promise<Produc
   return data.tips ?? []
 }
 
+/** Как в CRM ProductBlock: «В наличии» / «Под заказ» по warehouseType, не по stock. */
+export function isOrderWarehouseOffer(offer: ProductOffer): boolean {
+  return String(offer.warehouseType ?? '').toLowerCase() === 'order'
+}
+
 export function filterOffersByAvailability(
   items: ProductOffer[],
   filter: AvailabilityFilter,
 ): ProductOffer[] {
   switch (filter) {
     case 'available':
-      return items.filter((item) => (item.stock ?? 0) > 0)
+      return items.filter((item) => !isOrderWarehouseOffer(item))
     case 'order':
-      return items.filter((item) => (item.stock ?? 0) === 0)
+      return items.filter((item) => isOrderWarehouseOffer(item))
     default:
       return items
   }

@@ -62,7 +62,7 @@ export function AbyssSuppliersPanel({
         onClick={() => allMutation.mutate()}
       >
         <RefreshCw className={cnSpin(allMutation.isPending)} />
-        Обновить предложения по всем поставщикам
+        По всем поставщикам
       </Button>
 
       <div>

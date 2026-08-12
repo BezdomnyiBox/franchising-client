@@ -368,7 +368,7 @@ export function SearchOffersTable({
       ) : sorted.length === 0 ? (
         <p className="text-sm text-muted-foreground">{emptyText}</p>
       ) : (
-        <div className="max-h-[min(60vh,560px)] overflow-auto rounded-md border">
+        <div className="max-h-[min(75vh,720px)] overflow-auto rounded-md border">
           <Table className="min-w-[760px]">
             <TableHeader>
               <TableRow>
