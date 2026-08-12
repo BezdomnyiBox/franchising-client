@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ChevronDown, ChevronRight, Search } from 'lucide-react'
@@ -14,12 +14,15 @@ import {
   filterOffersByAvailability,
   formatTipLabel,
 } from '@/features/search/api'
+import { AbyssSuppliersPanel } from '@/features/search/AbyssSuppliersPanel'
 import { SearchOffersTable } from '@/features/search/SearchOffersTable'
+import { SearchProductCard } from '@/features/search/SearchProductCard'
 import { useAuth } from '@/features/auth/AuthContext'
 import type {
   AnalogProduct,
   AvailabilityFilter,
   ProductOffer,
+  ProductSearchResult,
   ProductTip,
 } from '@/entities/product/types'
 import { Badge } from '@/components/ui/badge'
@@ -39,11 +42,32 @@ function tipBrandName(tip: ProductTip): string {
   return tip.brand.name || formatTipLabel(tip)
 }
 
+function patchOfferInResult(
+  data: ProductSearchResult | undefined,
+  updated: ProductOffer,
+): ProductSearchResult | undefined {
+  if (!data) return data
+  return {
+    ...data,
+    items: data.items.map((item) =>
+      item.id === updated.id
+        ? {
+            ...item,
+            ...updated,
+            lineNumber: item.lineNumber,
+            isMargin: item.isMargin,
+          }
+        : item,
+    ),
+  }
+}
+
 function AnalogRow({
   analog,
   expanded,
   onToggle,
   orderId,
+  branchId,
   userId,
   canAdd,
   addingItemId,
@@ -54,17 +78,21 @@ function AnalogRow({
   expanded: boolean
   onToggle: () => void
   orderId?: number
+  branchId?: number
   userId?: number
   canAdd: boolean
   addingItemId: number | null
   searchProductId: number
   onAdd: (offer: ProductOffer, searchProductId: number) => void
 }) {
+  const queryClient = useQueryClient()
   const [availabilityFilter, setAvailabilityFilter] =
     useState<AvailabilityFilter>('available')
 
+  const queryKey = ['product-search', analog.productId, orderId, userId, 'analog'] as const
+
   const offersQuery = useQuery({
-    queryKey: ['product-search', analog.productId, orderId, userId, 'analog'],
+    queryKey,
     queryFn: () =>
       fetchProductSearch({
         productId: analog.productId,
@@ -122,8 +150,16 @@ function AnalogRow({
             availabilityFilter={availabilityFilter}
             availableCount={filterOffersByAvailability(allOffers, 'available').length}
             orderCount={filterOffersByAvailability(allOffers, 'order').length}
+            orderId={orderId}
+            branchId={branchId}
             onAvailabilityChange={setAvailabilityFilter}
             onAdd={(offer) => onAdd(offer, searchProductId)}
+            onOfferPatched={(updated) => {
+              queryClient.setQueryData(queryKey, (old: ProductSearchResult | undefined) =>
+                patchOfferInResult(old, updated),
+              )
+            }}
+            onNeedFullReload={() => void queryClient.invalidateQueries({ queryKey })}
           />
         </div>
       ) : null}
@@ -134,7 +170,7 @@ function AnalogRow({
 export function SearchPage() {
   const [params, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
-  const { user } = useAuth()
+  const { user, branchId, branchName } = useAuth()
 
   const article = params.get('article') ?? ''
   const productIdParam = params.get('productId')
@@ -222,6 +258,8 @@ export function SearchPage() {
     syncUrl({ productId: tip.id })
   }
 
+  const searchQueryKey = ['product-search', selectedTip?.id, orderId, user?.id] as const
+
   const countQuery = useQuery({
     queryKey: ['product-search-count', selectedTip?.id, orderId],
     queryFn: () => fetchProductSearchCount(selectedTip!.id, orderId),
@@ -229,14 +267,14 @@ export function SearchPage() {
   })
 
   const offersQuery = useQuery({
-    queryKey: ['product-search', selectedTip?.id, orderId, user?.id],
+    queryKey: searchQueryKey,
     queryFn: () =>
       fetchProductSearch({
         productId: selectedTip!.id,
         orderId,
         userId: user?.id,
       }),
-    enabled: selectedTip != null && resultTab === 'product',
+    enabled: selectedTip != null,
   })
 
   const analogsQuery = useQuery({
@@ -305,15 +343,6 @@ export function SearchPage() {
   })
 
   const canAdd = Boolean(orderId)
-  const productTitle = useMemo(() => {
-    if (!selectedTip) return null
-    const brand = tipBrandName(selectedTip)
-    return {
-      brand,
-      article: selectedTip.article,
-      name: selectedTip.name || offersQuery.data?.name || '',
-    }
-  }, [selectedTip, offersQuery.data?.name])
 
   const tabs: { id: ResultTab; label: string; count?: number; ourCount?: number }[] = [
     {
@@ -364,6 +393,7 @@ export function SearchPage() {
               setExpandedAnalogId((id) => (id === analog.id ? null : analog.id))
             }
             orderId={orderId}
+            branchId={branchId}
             userId={user?.id}
             canAdd={canAdd}
             addingItemId={addingItemId}
@@ -378,7 +408,7 @@ export function SearchPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Поиск товаров</h1>
         <p className="text-sm text-muted-foreground">
@@ -394,6 +424,11 @@ export function SearchPage() {
             '. Укажите № заказа или откройте поиск из карточки заказа.'
           )}
         </p>
+        {branchName || branchId ? (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Ваш ПВ: {branchName || `#${branchId}`}
+          </p>
+        ) : null}
       </div>
 
       <Card>
@@ -505,33 +540,45 @@ export function SearchPage() {
                 </Button>
               ))}
             </div>
-            {productTitle ? (
-              <div className="pt-2 text-sm">
-                <span className="font-semibold">{productTitle.brand}</span>
-                {' · '}
-                <span className="font-mono">{productTitle.article}</span>
-                {productTitle.name ? (
-                  <span className="text-muted-foreground"> — {productTitle.name}</span>
-                ) : null}
-              </div>
-            ) : null}
           </CardHeader>
           <CardContent>
             {resultTab === 'product' ? (
-              <SearchOffersTable
-                offers={offers}
-                loading={offersQuery.isLoading}
-                error={offersQuery.isError}
-                canAdd={canAdd}
-                addingItemId={addingItemId}
-                availabilityFilter={availabilityFilter}
-                availableCount={filterOffersByAvailability(allOffers, 'available').length}
-                orderCount={filterOffersByAvailability(allOffers, 'order').length}
-                onAvailabilityChange={setAvailabilityFilter}
-                onAdd={(offer) =>
-                  addMutation.mutate({ offer, searchProductId: selectedTip.id })
-                }
-              />
+              <div className="grid gap-6 lg:grid-cols-[minmax(240px,320px)_1fr]">
+                <div className="space-y-4">
+                  {offersQuery.isLoading && !offersQuery.data ? (
+                    <Skeleton className="h-48 w-full" />
+                  ) : offersQuery.data ? (
+                    <SearchProductCard product={offersQuery.data} />
+                  ) : null}
+                  <AbyssSuppliersPanel productId={selectedTip.id} orderId={orderId} />
+                </div>
+                <SearchOffersTable
+                  offers={offers}
+                  loading={offersQuery.isLoading}
+                  error={offersQuery.isError}
+                  canAdd={canAdd}
+                  addingItemId={addingItemId}
+                  availabilityFilter={availabilityFilter}
+                  availableCount={filterOffersByAvailability(allOffers, 'available').length}
+                  orderCount={filterOffersByAvailability(allOffers, 'order').length}
+                  orderId={orderId}
+                  branchId={branchId}
+                  onAvailabilityChange={setAvailabilityFilter}
+                  onAdd={(offer) =>
+                    addMutation.mutate({ offer, searchProductId: selectedTip.id })
+                  }
+                  onOfferPatched={(updated) => {
+                    queryClient.setQueryData(
+                      searchQueryKey,
+                      (old: ProductSearchResult | undefined) =>
+                        patchOfferInResult(old, updated),
+                    )
+                  }}
+                  onNeedFullReload={() =>
+                    void queryClient.invalidateQueries({ queryKey: searchQueryKey })
+                  }
+                />
+              </div>
             ) : null}
 
             {resultTab === 'analogs'

@@ -1,14 +1,18 @@
 import { http } from '@/shared/api/http'
+import { API_BASE_URL } from '@/shared/config'
 import type {
+  AbyssSupplier,
   AnalogProduct,
   AnalogsListResult,
   AvailabilityFilter,
+  OfferSortField,
   ProductOffer,
   ProductSearchCount,
   ProductSearchResult,
   ProductTip,
   SearchOffersParams,
   SearchTipsParams,
+  SortDirection,
 } from '@/entities/product/types'
 
 function asArray<T>(value: T[] | Record<string, T> | null | undefined): T[] {
@@ -24,6 +28,19 @@ function tipBrandName(tip: ProductTip): string {
 
 export function formatTipLabel(tip: ProductTip): string {
   return [tipBrandName(tip), tip.article].filter(Boolean).join(' ')
+}
+
+/** `/image/{id}.jpg` → через API gateway `/crm_fr/api/product/image/{id}.jpg` */
+export function resolveProductImageUrl(url: string): string {
+  if (!url) return ''
+  if (/^https?:\/\//i.test(url)) return url
+  if (url.startsWith('/image/')) {
+    return `${API_BASE_URL}/product${url}`
+  }
+  if (url.startsWith('/')) {
+    return `${API_BASE_URL}${url}`
+  }
+  return url
 }
 
 export function mapSearchOffer(raw: ProductOffer, index: number): ProductOffer {
@@ -75,6 +92,35 @@ export function filterOffersByAvailability(
     default:
       return items
   }
+}
+
+export function sortOffers(
+  items: ProductOffer[],
+  field: OfferSortField,
+  direction: SortDirection,
+): ProductOffer[] {
+  const mul = direction === 'asc' ? 1 : -1
+  return [...items].sort((a, b) => {
+    let cmp = 0
+    switch (field) {
+      case 'warehouse':
+        cmp = String(a.warehouseName ?? '').localeCompare(String(b.warehouseName ?? ''), 'ru')
+        break
+      case 'price':
+        cmp = (a.offerPrice ?? a.price ?? 0) - (b.offerPrice ?? b.price ?? 0)
+        break
+      case 'delivery': {
+        const da = a.deliveryDays ?? Number.POSITIVE_INFINITY
+        const db = b.deliveryDays ?? Number.POSITIVE_INFINITY
+        cmp = da - db
+        break
+      }
+      case 'quantity':
+        cmp = (a.stock ?? 0) - (b.stock ?? 0)
+        break
+    }
+    return cmp * mul
+  })
 }
 
 export async function fetchProductSearch(
@@ -149,6 +195,41 @@ export async function fetchProductSearchCount(
     params: { orderId },
   })
   return data ?? {}
+}
+
+export async function updateProductItem(
+  itemId: number,
+  params?: { orderId?: number; branchId?: number },
+): Promise<ProductOffer> {
+  const { data } = await http.post<ProductOffer>(`/product/update_item/${itemId}`, null, {
+    params: {
+      orderId: params?.orderId,
+      branch: params?.branchId,
+    },
+  })
+  return mapSearchOffer(data ?? { id: itemId }, 0)
+}
+
+export async function fetchAbyssSuppliers(orderId?: number): Promise<AbyssSupplier[]> {
+  const { data } = await http.get<AbyssSupplier[]>('/product/abyss_suppliers', {
+    params: { orderId },
+  })
+  return Array.isArray(data) ? data : []
+}
+
+export async function updateProductByApi(
+  productId: number,
+  apiParamId: number,
+  orderId?: number,
+): Promise<void> {
+  await http.post(`/product/${productId}/update_by_api/${apiParamId}`, { orderId })
+}
+
+export async function abyssUpdateProduct(
+  productId: number,
+  orderId?: number,
+): Promise<void> {
+  await http.post(`/product/abyss_update/${productId}`, { orderId })
 }
 
 export interface SetOrderElementItemPayload {

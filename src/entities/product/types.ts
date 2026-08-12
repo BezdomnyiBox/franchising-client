@@ -1,6 +1,12 @@
 export interface ProductBrand {
   id?: number
   name?: string
+  country?: string
+  countryFlagAlias?: string
+  description?: string
+  slug?: string
+  certificates?: string[]
+  carManufacturer?: boolean
 }
 
 /** Подсказка GET /product/tips */
@@ -28,6 +34,11 @@ export interface ProductOffer {
   legacyWarehouse?: number
   supplierAlias?: string
   accessAddToOrder?: boolean
+  updateable?: boolean
+  updateTime?: string
+  needUpdate?: boolean
+  warrantyPeriod?: number
+  multiplicity?: number
   product?: {
     id?: number
     article?: string
@@ -48,9 +59,17 @@ export interface ProductSearchResult {
   article?: string
   name?: string
   brand?: ProductBrand
+  images?: string[]
+  category?: {
+    id?: number
+    nameSingularly?: string
+    namePlural?: string
+  } | null
   items: ProductOffer[]
   itemsCount?: number
   needAbyssUpdate?: boolean
+  searchBranchId?: number
+  searchBranchName?: string
 }
 
 export interface ProductSearchCount {
@@ -87,7 +106,16 @@ export interface AnalogsListResult {
   emptyItems?: AnalogProduct[]
 }
 
+export interface AbyssSupplier {
+  id: number
+  supplierName: string
+  supplierAlias?: string
+}
+
 export type AvailabilityFilter = 'available' | 'order' | 'all'
+
+export type OfferSortField = 'warehouse' | 'price' | 'delivery' | 'quantity'
+export type SortDirection = 'asc' | 'desc'
 
 export interface SearchTipsParams {
   q: string
