@@ -433,6 +433,11 @@ export function OrderDetailPage() {
             <Bell className="size-4" />
             Напоминание
           </Button>
+          <OrderComments
+            orderId={order.id}
+            personalComments={order.personalComments}
+            collectiveComments={order.collectiveComments}
+          />
           <CopyOrderActions orderId={order.id} variant="button" />
         </div>
       </div>
@@ -587,19 +592,6 @@ export function OrderDetailPage() {
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Комментарии</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <OrderComments
-            orderId={order.id}
-            personalComments={order.personalComments}
-            collectiveComments={order.collectiveComments}
-          />
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader className="pb-3">
