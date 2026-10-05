@@ -7,6 +7,12 @@ export const APP_BASE_PATH = (
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? `${APP_BASE_PATH}/api`
 
+/**
+ * Все API франшизы на back живут под /franchising.
+ * FE ходит сюда: /crm_fr/api/franchising/...
+ */
+export const FRANCHISING_API_BASE = `${API_BASE_URL}/franchising`
+
 /** Смещение публичного номера заказа → internal id (как в CRM). */
 export const ORDER_NUMBER_OFFSET = 40777
 
@@ -20,10 +26,10 @@ export function orderIdToPublicNumber(orderId: string | number): number {
 
 /** Печать кассового ордера (same-origin cookie /crm_fr). */
 export function cashierOrderPrintUrl(orderId: number): string {
-  return `${API_BASE_URL}/bookkeeping/print_cashier_order/${orderId}`
+  return `${FRANCHISING_API_BASE}/bookkeeping/print_cashier_order/${orderId}`
 }
 
 /** Публичная ссылка на сформированный счёт. */
 export function publicInvoiceUrl(printHash: string): string {
-  return `${API_BASE_URL}/public_invoice/${printHash}`
+  return `${FRANCHISING_API_BASE}/public_invoice/${printHash}`
 }

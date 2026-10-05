@@ -56,7 +56,8 @@ npm run dev
 
 Dev-прокси (см. `vite.config.ts`): `/crm_fr/api/*` → `VITE_API_PROXY_TARGET` (`http://back.public.lan`).
 
-Единый бэкенд: `backend_7x`. Список роутов для переноса: [`docs/routes-to-migrate.md`](./docs/routes-to-migrate.md).
+Единый бэкенд: `backend_7x`. Все API франшизы под префиксом `/franchising`
+(`http` baseURL = `/crm_fr/api/franchising`). Список роутов: [`docs/routes-to-migrate.md`](./docs/routes-to-migrate.md).
 
 Cookie с бэкенда переписываются под localhost (`Domain`/`Secure` снимаются).
 

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { API_BASE_URL } from '@/shared/config'
+import { FRANCHISING_API_BASE } from '@/shared/config'
 
 export const money = (n) => n.toLocaleString('ru-RU') + ' ₽'
 
@@ -34,9 +34,9 @@ export const resolveImageSrc = (src) => {
   if (!src) return null
   if (/^https?:\/\//i.test(src)) return src
   if (src.startsWith('/image/')) {
-    return `${API_BASE_URL}/product${src}`
+    return `${FRANCHISING_API_BASE}/product${src}`
   }
-  return `${API_BASE_URL}${src.startsWith('/') ? src : `/${src}`}`
+  return `${FRANCHISING_API_BASE}${src.startsWith('/') ? src : `/${src}`}`
 }
 
 export const formatAssemblyTime = (assemblyTime) => {

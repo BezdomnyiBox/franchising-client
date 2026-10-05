@@ -1,4 +1,3 @@
-import axios from 'axios'
 import { http } from '@/shared/api/http'
 import { clearFranchisingAuthCookie, normalizeLoginPhone } from '@/shared/authCookie'
 import type { FranchiseUser } from '@/entities/user/types'
@@ -10,30 +9,13 @@ interface FranchisingLoginResponse {
   error?: string
 }
 
-function statusOf(error: unknown): number | undefined {
-  return axios.isAxiosError(error) ? error.response?.status : undefined
-}
-
 /**
  * Текущий пользователь по cookie franchising_auth.
- * Fallback на /user/crm_info только если /me ещё не задеплоен (404),
- * не при 401 — иначе на public.lan/podzamenu.ru «выход» подхватывает cookie сайта.
+ * GET /franchising/auth/me
  */
 export async function fetchCurrentUser(): Promise<FranchiseUser> {
-  try {
-    const { data } = await http.get<FranchiseUser>('/franchising/auth/me')
-    return data
-  } catch (error) {
-    const status = statusOf(error)
-    if (status === 401 || status === 403) {
-      throw error
-    }
-    if (status !== 404) {
-      throw error
-    }
-    const { data } = await http.get<FranchiseUser>('/user/crm_info')
-    return data
-  }
+  const { data } = await http.get<FranchiseUser>('/auth/me')
+  return data
 }
 
 /**
@@ -41,7 +23,7 @@ export async function fetchCurrentUser(): Promise<FranchiseUser> {
  * Set-Cookie: franchising_auth (HttpOnly) через Vite proxy.
  */
 export async function loginWithPassword(phone: string, password: string): Promise<void> {
-  const path = import.meta.env.VITE_LOGIN_PATH || '/franchising/auth/login'
+  const path = import.meta.env.VITE_LOGIN_PATH || '/auth/login'
   const { data, status } = await http.post<FranchisingLoginResponse>(
     path,
     {
@@ -64,7 +46,7 @@ export async function loginWithPassword(phone: string, password: string): Promis
 
 export async function logout(): Promise<void> {
   try {
-    await http.post('/franchising/auth/logout', null, {
+    await http.post('/auth/logout', null, {
       validateStatus: (s) => s >= 200 && s < 500,
     })
   } catch {

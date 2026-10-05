@@ -1,5 +1,5 @@
 import { http } from '@/shared/api/http'
-import { API_BASE_URL } from '@/shared/config'
+import { FRANCHISING_API_BASE } from '@/shared/config'
 import type {
   ProductOffer,
   ProductSearchCount,
@@ -19,15 +19,15 @@ export function formatTipLabel(tip: ProductTip): string {
   return [tipBrandName(tip), tip.article].filter(Boolean).join(' ')
 }
 
-/** `/image/{id}.jpg` → через API gateway `/crm_fr/api/product/image/{id}.jpg` */
+/** `/image/{id}.jpg` → `/crm_fr/api/franchising/product/image/{id}.jpg` */
 export function resolveProductImageUrl(url: string): string {
   if (!url) return ''
   if (/^https?:\/\//i.test(url)) return url
   if (url.startsWith('/image/')) {
-    return `${API_BASE_URL}/product${url}`
+    return `${FRANCHISING_API_BASE}/product${url}`
   }
   if (url.startsWith('/')) {
-    return `${API_BASE_URL}${url}`
+    return `${FRANCHISING_API_BASE}${url}`
   }
   return url
 }

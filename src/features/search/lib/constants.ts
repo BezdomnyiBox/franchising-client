@@ -1,9 +1,8 @@
 // @ts-nocheck
-import { API_BASE_URL } from '@/shared/config'
+import { FRANCHISING_API_BASE } from '@/shared/config'
 
-/** Единый бэкенд: back.public.lan через /crm_fr/api. */
-export const BACK_HOST = API_BASE_URL
-export const CRM_HOST = API_BASE_URL
+/** Все роуты франшизы на back: /crm_fr/api/franchising/... */
+export const BACK_HOST = FRANCHISING_API_BASE
 
 export const TAB_OFFERS_ALL = 'all'
 export const TAB_SEARCHED = 'searched'

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useEffect, useState } from 'react'
-import { CRM_HOST } from '../lib/constants'
+import { BACK_HOST } from '../lib/constants'
 import { formatAssemblyTime } from '../lib/format'
 
 export function AddToOrderModal({ good, offer, initialOrderNumber = '', onClose }) {
@@ -9,7 +9,7 @@ export function AddToOrderModal({ good, offer, initialOrderNumber = '', onClose 
   const handleAddToOrder = () => {
     if (!orderNumber) return
 
-    fetch(`${CRM_HOST}/order/add_offer_product`, {
+    fetch(`${BACK_HOST}/order/add_offer_product`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },

@@ -1,8 +1,9 @@
 import axios from 'axios'
-import { API_BASE_URL } from '@/shared/config'
+import { FRANCHISING_API_BASE } from '@/shared/config'
 
+/** Все вызовы франшизы → /crm_fr/api/franchising/... */
 export const http = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: FRANCHISING_API_BASE,
   withCredentials: true,
   headers: {
     Accept: 'application/json',
