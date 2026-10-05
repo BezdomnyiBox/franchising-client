@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { FRANCHISING_API_BASE } from '@/shared/config'
+import { FRANCHISING_API_BASE, SITE_HOST } from '@/shared/config'
 
 export const money = (n) => n.toLocaleString('ru-RU') + ' ₽'
 
@@ -33,8 +33,9 @@ export const formatCitiesMoreCount = (count) => {
 export const resolveImageSrc = (src) => {
   if (!src) return null
   if (/^https?:\/\//i.test(src)) return src
+  // CRM: /image/{id}.jpg → public.lan → crm product/image
   if (src.startsWith('/image/')) {
-    return `${FRANCHISING_API_BASE}/product${src}`
+    return `${SITE_HOST}${src}`
   }
   return `${FRANCHISING_API_BASE}${src.startsWith('/') ? src : `/${src}`}`
 }

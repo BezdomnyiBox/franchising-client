@@ -1,5 +1,5 @@
 import { http } from '@/shared/api/http'
-import { FRANCHISING_API_BASE } from '@/shared/config'
+import { SITE_HOST } from '@/shared/config'
 import type {
   ProductOffer,
   ProductSearchCount,
@@ -19,15 +19,15 @@ export function formatTipLabel(tip: ProductTip): string {
   return [tipBrandName(tip), tip.article].filter(Boolean).join(' ')
 }
 
-/** `/image/{id}.jpg` → `/crm_fr/api/franchising/product/image/{id}.jpg` */
+/** `/image/{id}.jpg` → публичный сайт (как в CRM), не franchising API. */
 export function resolveProductImageUrl(url: string): string {
   if (!url) return ''
   if (/^https?:\/\//i.test(url)) return url
   if (url.startsWith('/image/')) {
-    return `${FRANCHISING_API_BASE}/product${url}`
+    return `${SITE_HOST}${url}`
   }
   if (url.startsWith('/')) {
-    return `${FRANCHISING_API_BASE}${url}`
+    return `${SITE_HOST}${url}`
   }
   return url
 }

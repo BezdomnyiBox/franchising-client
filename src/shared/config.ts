@@ -13,6 +13,15 @@ export const API_BASE_URL =
  */
 export const FRANCHISING_API_BASE = `${API_BASE_URL}/franchising`
 
+/**
+ * Публичный сайт с раздачей фото `/image/{id}.jpg`
+ * (как SITE_HOST в CRM SearchContainer → redirect на crm product/image).
+ * Не через franchising API: там файлов на диске back часто нет → 404.
+ */
+export const SITE_HOST = (
+  import.meta.env.VITE_SITE_HOST || 'http://public.lan'
+).replace(/\/$/, '')
+
 /** Смещение публичного номера заказа → internal id (как в CRM). */
 export const ORDER_NUMBER_OFFSET = 40777
 
