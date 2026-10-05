@@ -1,4 +1,3 @@
-import { MemoryRouter } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { SearchContainer } from '@/features/search/SearchContainer'
 import { useAuth } from '@/features/auth/AuthContext'
@@ -14,16 +13,6 @@ export interface SearchForOrderDialogProps {
   userId?: number
   onClose: () => void
   onSuccess: () => void
-}
-
-function buildSearchEntry(article: string, orderNumber: number | string): string {
-  const params = new URLSearchParams()
-  if (article.trim()) params.set('article', article.trim())
-  if (orderNumber != null && String(orderNumber).trim()) {
-    params.set('orderNumber', String(orderNumber).trim())
-  }
-  const query = params.toString()
-  return query ? `/?${query}` : '/'
 }
 
 export function SearchForOrderDialog({
@@ -62,25 +51,24 @@ export function SearchForOrderDialog({
       </header>
 
       <div className="mx-auto w-full max-w-7xl flex-1 overflow-auto p-4">
-        <MemoryRouter
+        <SearchContainer
           key={`${orderElementId}|${initArticle}|${orderNumber}`}
-          initialEntries={[buildSearchEntry(initArticle, orderNumber)]}
-        >
-          <SearchContainer
-            branchId={branchId}
-            branchName={branchName}
-            offerAction={{
-              mode: 'set-to-element',
-              target: {
-                orderElementId,
-                onPicked: () => {
-                  onSuccess()
-                  onClose()
-                },
+          branchId={branchId}
+          branchName={branchName}
+          syncUrl={false}
+          initialArticle={initArticle}
+          initialOrderNumber={String(orderNumber ?? '')}
+          offerAction={{
+            mode: 'set-to-element',
+            target: {
+              orderElementId,
+              onPicked: () => {
+                onSuccess()
+                onClose()
               },
-            }}
-          />
-        </MemoryRouter>
+            },
+          }}
+        />
       </div>
     </div>
   )

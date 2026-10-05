@@ -32,19 +32,45 @@ type SearchContainerProps = {
   branchId?: number
   branchName?: string
   townId?: number
-  offerAction?: { mode: 'add-to-order' } | { mode: 'set-to-element'; target: { orderElementId: number; onPicked?: () => void; onError?: (message: string) => void } }
+  /** false — диалог позиции: state локальный, URL браузера не трогаем */
+  syncUrl?: boolean
+  initialArticle?: string
+  initialBrand?: string
+  initialOrderNumber?: string
+  offerAction?: {
+    mode: 'add-to-order'
+  } | {
+    mode: 'set-to-element'
+    target: {
+      orderElementId: number
+      onPicked?: () => void
+      onError?: (message: string) => void
+    }
+  }
 }
 
 export function SearchContainer({
   branchId: branchIdProp,
   branchName,
   townId: townIdProp,
+  syncUrl = true,
+  initialArticle = '',
+  initialBrand = '',
+  initialOrderNumber: seedOrderNumber = '',
   offerAction = { mode: 'add-to-order' },
 }: SearchContainerProps = {}) {
   const [searchParams, setSearchParams] = useSearchParams()
-  const articleParam = searchParams.get('article') || ''
-  const brandParam = searchParams.get('brand') || ''
-  const orderNumberParam = searchParams.get('orderNumber') || ''
+  const [localQuery, setLocalQuery] = useState({
+    article: initialArticle,
+    brand: initialBrand,
+    orderNumber: seedOrderNumber,
+  })
+
+  const articleParam = syncUrl ? searchParams.get('article') || '' : localQuery.article
+  const brandParam = syncUrl ? searchParams.get('brand') || '' : localQuery.brand
+  const orderNumberParam = syncUrl
+    ? searchParams.get('orderNumber') || ''
+    : localQuery.orderNumber
   const resolvedBranchId = Number(branchIdProp) || 1
 
   const [searchArticle, setSearchArticle] = useState(articleParam)
@@ -102,18 +128,23 @@ export function SearchContainer({
 
   const updateSearchUrl = useCallback(
     (article, brand, orderNumber = '', { replace = false } = {}) => {
+      if (!syncUrl) {
+        setLocalQuery({ article, brand, orderNumber })
+        return
+      }
       const params = new URLSearchParams()
       if (article) params.set('article', article)
       if (brand) params.set('brand', brand)
       if (orderNumber) params.set('orderNumber', orderNumber)
       setSearchParams(params, { replace })
     },
-    [setSearchParams],
+    [setSearchParams, syncUrl],
   )
 
   const applyAutoBrandToUrl = useCallback(
     (article, brand, orderNumber = '') => {
-      if (!article || !brand || searchParams.get('brand')) return
+      const hasBrand = syncUrl ? Boolean(searchParams.get('brand')) : Boolean(localQuery.brand)
+      if (!article || !brand || hasBrand) return
 
       const selectKey = `${article}|${orderNumber}`
       if (autoBrandAppliedRef.current === selectKey) return
@@ -122,7 +153,7 @@ export function SearchContainer({
       setSearchBrand(brand)
       updateSearchUrl(article, brand, orderNumber, { replace: true })
     },
-    [searchParams, updateSearchUrl],
+    [localQuery.brand, searchParams, syncUrl, updateSearchUrl],
   )
 
   const applyBrandVariants = useCallback((incoming) => {
