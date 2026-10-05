@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       allowedHosts: ['public.lan', 'localhost', '.public.lan'],
       proxy: {
-        // Как prod: /crm_fr/api/* → backend/* (same-origin cookie-сессия)
+        // Единый бэкенд: /crm_fr/api/* → back.public.lan/*
         [apiPrefix]: {
           target: proxyTarget,
           changeOrigin: true,

@@ -3,7 +3,7 @@ export const APP_BASE_PATH = (
   import.meta.env.VITE_APP_BASE_PATH || '/crm_fr'
 ).replace(/\/$/, '')
 
-/** Same-origin gateway: /crm_fr/api → бэкенд (Vite/Apache/Nginx proxy). */
+/** Same-origin gateway: /crm_fr/api → back.public.lan (Vite/Apache/Nginx proxy). */
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? `${APP_BASE_PATH}/api`
 

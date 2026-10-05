@@ -54,7 +54,10 @@ npm run dev
 
 Открывать: `http://public.lan:5173/crm_fr/` (Vite) или после build — `http://public.lan/crm_fr/`.
 
-Dev-прокси: `/crm_fr/api/*` → `VITE_API_PROXY_TARGET` (см. `vite.config.ts`).  
+Dev-прокси (см. `vite.config.ts`): `/crm_fr/api/*` → `VITE_API_PROXY_TARGET` (`http://back.public.lan`).
+
+Единый бэкенд: `backend_7x`. Список роутов для переноса: [`docs/routes-to-migrate.md`](./docs/routes-to-migrate.md).
+
 Cookie с бэкенда переписываются под localhost (`Domain`/`Secure` снимаются).
 
 Сборка под Apache LAN / prod:
@@ -84,7 +87,7 @@ Env:
 |------------|--------|
 | `VITE_APP_BASE_PATH` | `/crm_fr` |
 | `VITE_API_BASE_URL` | `/crm_fr/api` |
-| `VITE_API_PROXY_TARGET` | LAN: `http://back.public.lan` · prod/remote: `https://back.podzamenu.ru` |
+| `VITE_API_PROXY_TARGET` | LAN: `http://back.public.lan` · prod: `https://back.podzamenu.ru` |
 | `VITE_LOGIN_PATH` | `/franchising/auth/login` |
 
 ## OpenAPI
