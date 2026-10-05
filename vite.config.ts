@@ -18,7 +18,7 @@ function rewriteCookies(setCookie: string[] | undefined): string[] | undefined {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, rootDir, '')
-  const proxyTarget = env.VITE_API_PROXY_TARGET || 'http://crm.public.lan'
+  const proxyTarget = env.VITE_API_PROXY_TARGET || 'http://back.public.lan'
   const appBase = (env.VITE_APP_BASE_PATH || '/crm_fr').replace(/\/$/, '')
   const apiPrefix = `${appBase}/api`
 

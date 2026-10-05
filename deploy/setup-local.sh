@@ -54,5 +54,5 @@ fi
 apache2ctl configtest
 systemctl reload apache2
 echo "Готово: http://public.lan/crm_fr/"
-echo "API gateway: http://public.lan/crm_fr/api/ → crm.public.lan"
+echo "API gateway: http://public.lan/crm_fr/api/ → back.public.lan (backend_7x)"
 echo "После изменений фронта: cd $ROOT && npm run build"

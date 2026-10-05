@@ -36,7 +36,7 @@ https://podzamenu.ru/crm               → основная CRM
 
 LAN (тот же хост, что и сайт/CRM):
 http://public.lan/crm_fr/*             → статика SPA
-http://public.lan/crm_fr/api/*         → proxy → http://crm.public.lan/*
+http://public.lan/crm_fr/api/*         → proxy → http://back.public.lan/*   (backend_7x)
 http://public.lan/crm                  → основная CRM
 ```
 
@@ -84,7 +84,7 @@ Env:
 |------------|--------|
 | `VITE_APP_BASE_PATH` | `/crm_fr` |
 | `VITE_API_BASE_URL` | `/crm_fr/api` |
-| `VITE_API_PROXY_TARGET` | `http://crm.public.lan` / `https://back.podzamenu.ru` |
+| `VITE_API_PROXY_TARGET` | LAN: `http://back.public.lan` · prod/remote: `https://back.podzamenu.ru` |
 | `VITE_LOGIN_PATH` | `/franchising/auth/login` |
 
 ## OpenAPI
