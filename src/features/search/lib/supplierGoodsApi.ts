@@ -225,3 +225,18 @@ export const fetchAnalogs = ({ article, brand, requestId, requestIdRef }) => {
       return []
     })
 }
+
+/** Карточка ABCP: описание, свойства, кроссы. */
+export const fetchAbcpProductInfo = ({ brand, article }) => {
+  const params = buildGoodsParams({ article, brand })
+  return fetch(`${BACK_HOST}/product-abcp-info?${params}`, {
+    method: 'GET',
+    credentials: 'include',
+  }).then(async (response) => {
+    const data = await response.json().catch(() => null)
+    if (!response.ok) {
+      throw new Error(data?.error || 'Ошибка ABCP')
+    }
+    return data
+  })
+}

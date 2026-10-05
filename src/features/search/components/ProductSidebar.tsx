@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { getGoodImageSrc, money } from '../lib/format'
 import { computeOfferStats, normalizeOffers } from '../lib/offers'
+import { AbcpInfoButton } from './AbcpInfoButton'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -56,6 +57,12 @@ export function ProductSidebar({ good, offers, analogsCount, loading }) {
               </div>
             ))}
           </dl>
+          {good.brand && good.article ? (
+            <>
+              <Separator />
+              <AbcpInfoButton brand={good.brand} article={good.article} />
+            </>
+          ) : null}
         </CardContent>
       </Card>
     </aside>
