@@ -1,6 +1,8 @@
 // @ts-nocheck
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Check, Plus } from 'lucide-react'
+import { toast } from 'sonner'
+import { setOrderElementOfferProduct } from '../api'
 import { formatAssemblyTime, money } from '../lib/format'
 import { getEtaSpeed, getOfferDays } from '../lib/offers'
 import { AddToOrderModal } from './AddToOrderModal'
@@ -10,14 +12,54 @@ import { Button } from '@/components/ui/button'
 import { TableCell, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
-export function OfferRow({ good, offer, isBest, isFast, initialOrderNumber }) {
+export function OfferRow({
+  good,
+  offer,
+  isBest,
+  isFast,
+  initialOrderNumber,
+  offerAction = { mode: 'add-to-order' },
+}) {
   const [modalOpen, setModalOpen] = useState(false)
+  const [picking, setPicking] = useState(false)
   const supplierLabel = offer.warehousePublicName
     ? offer.warehousePublicName
     : offer.supplierName || offer.warehousePublicName || ''
   const days = getOfferDays(offer)
   const speed = getEtaSpeed(days)
   const displayPrice = offer.offerPrice || offer.price
+  const isPickMode = offerAction.mode === 'set-to-element'
+
+  const handlePickToElement = async () => {
+    if (!isPickMode || picking) return
+    setPicking(true)
+    try {
+      const result = await setOrderElementOfferProduct(offerAction.target.orderElementId, {
+        brand: good.brand,
+        article: good.article,
+        name: good.name,
+        price: offer.price,
+        offerPrice: offer.offerPrice,
+        quantity: offer.stock,
+        warehouseVendorId: offer.warehouseVendorId,
+        supplierAlias: offer.supplierAlias,
+        deliveryDuration: offer.deliveryDuration,
+        multiplicity: offer.multiplicity,
+        productId: good.id || good.productId,
+      })
+      if (result.result === 'failed' || result.result === 'error') {
+        throw new Error(result.error || result.message || 'Не удалось подставить товар')
+      }
+      toast.success('Товар подставлен в позицию')
+      offerAction.target.onPicked?.()
+    } catch (error) {
+      const message = error?.message || 'Ошибка set_offer_product'
+      toast.error(message)
+      offerAction.target.onError?.(message)
+    } finally {
+      setPicking(false)
+    }
+  }
 
   return (
     <>
@@ -55,19 +97,28 @@ export function OfferRow({ good, offer, isBest, isFast, initialOrderNumber }) {
         </TableCell>
         <TableCell className="text-muted-foreground">{offer.warranty || '—'}</TableCell>
         <TableCell className="text-right">
-          <Button type="button" size="sm" onClick={() => setModalOpen(true)}>
-            <Plus className="size-4" />
-            В заказ
-          </Button>
+          {isPickMode ? (
+            <Button type="button" size="sm" disabled={picking} onClick={() => void handlePickToElement()}>
+              <Check className="size-4" />
+              {picking ? '…' : 'В позицию'}
+            </Button>
+          ) : (
+            <Button type="button" size="sm" onClick={() => setModalOpen(true)}>
+              <Plus className="size-4" />
+              В заказ
+            </Button>
+          )}
         </TableCell>
       </TableRow>
-      <AddToOrderModal
-        good={good}
-        offer={offer}
-        initialOrderNumber={initialOrderNumber}
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-      />
+      {!isPickMode ? (
+        <AddToOrderModal
+          good={good}
+          offer={offer}
+          initialOrderNumber={initialOrderNumber}
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+        />
+      ) : null}
     </>
   )
 }

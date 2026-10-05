@@ -32,12 +32,14 @@ type SearchContainerProps = {
   branchId?: number
   branchName?: string
   townId?: number
+  offerAction?: { mode: 'add-to-order' } | { mode: 'set-to-element'; target: { orderElementId: number; onPicked?: () => void; onError?: (message: string) => void } }
 }
 
 export function SearchContainer({
   branchId: branchIdProp,
   branchName,
   townId: townIdProp,
+  offerAction = { mode: 'add-to-order' },
 }: SearchContainerProps = {}) {
   const [searchParams, setSearchParams] = useSearchParams()
   const articleParam = searchParams.get('article') || ''
@@ -514,36 +516,38 @@ export function SearchContainer({
 
         <main className="min-w-0 flex-1 space-y-4">
           <section hidden={activeTab !== TAB_SEARCHED}>
-            <SearchedProductPanel
-              articleParam={articleParam}
-              isSearchLoading={isSearchLoading}
-              currentGood={currentGood}
-              brands={brands}
-              offers={offers}
-              availableLoading={availableLoading}
-              offerLoading={offerLoading}
-              supplierOfferGroups={supplierOfferGroups}
-              onToggleSupplier={handleToggleSupplierOffer}
-              initialOrderNumber={initialOrderNumber}
-              cities={cities}
-              citiesLoading={citiesLoading}
-              currentTownId={publicBranch.townId}
-            />
-          </section>
+              <SearchedProductPanel
+                articleParam={articleParam}
+                isSearchLoading={isSearchLoading}
+                currentGood={currentGood}
+                brands={brands}
+                offers={offers}
+                availableLoading={availableLoading}
+                offerLoading={offerLoading}
+                supplierOfferGroups={supplierOfferGroups}
+                onToggleSupplier={handleToggleSupplierOffer}
+                initialOrderNumber={initialOrderNumber}
+                cities={cities}
+                citiesLoading={citiesLoading}
+                currentTownId={publicBranch.townId}
+                offerAction={offerAction}
+              />
+            </section>
 
-          <section hidden={activeTab !== TAB_ANALOGS}>
-            <AnalogsPanel
-              currentGood={currentGood}
-              offerStats={offerStats}
-              onBackToOffers={setActiveTab}
-              analogsLoading={analogsLoading}
-              analogs={analogs}
-              branchId={branchId}
-              initialOrderNumber={initialOrderNumber}
-              articleParam={articleParam}
-              brandParam={brandParam}
-            />
-          </section>
+            <section hidden={activeTab !== TAB_ANALOGS}>
+              <AnalogsPanel
+                currentGood={currentGood}
+                offerStats={offerStats}
+                onBackToOffers={setActiveTab}
+                analogsLoading={analogsLoading}
+                analogs={analogs}
+                branchId={branchId}
+                initialOrderNumber={initialOrderNumber}
+                articleParam={articleParam}
+                brandParam={brandParam}
+                offerAction={offerAction}
+              />
+            </section>
         </main>
       </div>
     </div>

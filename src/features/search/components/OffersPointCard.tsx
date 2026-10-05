@@ -14,6 +14,7 @@ export function OffersPointCard({
   initialOrderNumber,
   collapsed,
   onToggle,
+  offerAction = { mode: 'add-to-order' },
 }) {
   return (
     <Card>
@@ -51,7 +52,12 @@ export function OffersPointCard({
       </CardHeader>
       {!collapsed ? (
         <CardContent className="pt-4">
-          <OffersTable good={good} offers={offers} initialOrderNumber={initialOrderNumber} />
+          <OffersTable
+            good={good}
+            offers={offers}
+            initialOrderNumber={initialOrderNumber}
+            offerAction={offerAction}
+          />
         </CardContent>
       ) : null}
     </Card>

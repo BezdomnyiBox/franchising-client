@@ -17,6 +17,7 @@ export function SearchedProductPanel({
   cities,
   citiesLoading,
   currentTownId,
+  offerAction = { mode: 'add-to-order' },
 }) {
   if (!articleParam) {
     return (
@@ -53,6 +54,7 @@ export function SearchedProductPanel({
         cities={cities}
         citiesLoading={citiesLoading}
         currentTownId={currentTownId}
+        offerAction={offerAction}
       />
     )
   }

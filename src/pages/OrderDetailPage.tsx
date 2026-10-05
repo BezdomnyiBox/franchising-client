@@ -589,7 +589,7 @@ export function OrderDetailPage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Позиции заказа</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Enter в ОЕМ или кнопка корзины — поиск и подстановка через set_item (как в CRM).
+            Enter в ОЕМ или кнопка корзины — новый поиск (supplier-goods) и подстановка в позицию.
           </p>
         </CardHeader>
         <CardContent>

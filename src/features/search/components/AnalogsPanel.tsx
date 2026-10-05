@@ -19,6 +19,7 @@ export function AnalogsPanel({
   initialOrderNumber,
   articleParam,
   brandParam,
+  offerAction = { mode: 'add-to-order' },
 }) {
   return (
     <Card>
@@ -58,6 +59,7 @@ export function AnalogsPanel({
               item={item}
               branchId={branchId}
               orderNumber={initialOrderNumber}
+              offerAction={offerAction}
             />
           ))
         ) : (

@@ -43,6 +43,7 @@ export function OffersMainSection({
   cities = [],
   citiesLoading = false,
   currentTownId,
+  offerAction = { mode: 'add-to-order' },
 }) {
   const [offersTab, setOffersTab] = useState(OFFERS_TAB_AVAILABLE)
   const [pointCollapsed, setPointCollapsed] = useState(false)
@@ -262,6 +263,7 @@ export function OffersMainSection({
             initialOrderNumber={initialOrderNumber}
             collapsed={pointCollapsed}
             onToggle={() => setPointCollapsed((value) => !value)}
+            offerAction={offerAction}
           />
         ) : offersTab === OFFERS_TAB_AVAILABLE ? (
           <SearchEmpty>Нет предложений в наличии</SearchEmpty>
@@ -282,6 +284,7 @@ export function OffersMainSection({
             initialOrderNumber={initialOrderNumber}
             onToggleSupplier={onToggleSupplier}
             filters={filters}
+            offerAction={offerAction}
           />
         )}
       </div>

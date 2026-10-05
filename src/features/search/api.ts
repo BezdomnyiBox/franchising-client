@@ -140,6 +140,32 @@ export async function addAccompanyingItem(orderElementId: number): Promise<void>
   await http.post(`/order_element/${orderElementId}/add_accompanying_item`)
 }
 
+export interface SetOrderElementOfferProductPayload {
+  brand: string
+  article: string
+  name?: string
+  price?: number
+  offerPrice?: number
+  quantity?: number
+  warehouseVendorId?: string | number
+  supplierAlias?: string
+  deliveryDuration?: number
+  multiplicity?: number
+  productId?: number
+  brandId?: number
+}
+
+export async function setOrderElementOfferProduct(
+  orderElementId: number,
+  payload: SetOrderElementOfferProductPayload,
+): Promise<{ result?: string; message?: string; error?: string }> {
+  const { data } = await http.post<{ result?: string; message?: string; error?: string }>(
+    `/order_element/${orderElementId}/set_offer_product`,
+    payload,
+  )
+  return data ?? { result: 'success' }
+}
+
 export async function patchOrderElementOem(
   orderElementId: number,
   value: string,

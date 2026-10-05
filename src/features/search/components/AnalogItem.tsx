@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
-export function AnalogItem({ item, branchId, orderNumber }) {
+export function AnalogItem({ item, branchId, orderNumber, offerAction = { mode: 'add-to-order' } }) {
   const [expanded, setExpanded] = useState(false)
   const [offers, setOffers] = useState(EMPTY_OFFERS)
   const [offersLoaded, setOffersLoaded] = useState(false)
@@ -186,6 +186,7 @@ export function AnalogItem({ item, branchId, orderNumber }) {
             supplierOfferGroups={supplierOfferGroups}
             onToggleSupplier={handleToggleSupplierOffer}
             initialOrderNumber={orderNumber}
+            offerAction={offerAction}
           />
         </CardContent>
       ) : null}

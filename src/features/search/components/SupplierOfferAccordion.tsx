@@ -7,7 +7,13 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
-export function SupplierOfferAccordion({ good, group, initialOrderNumber, onToggle }) {
+export function SupplierOfferAccordion({
+  good,
+  group,
+  initialOrderNumber,
+  onToggle,
+  offerAction = { mode: 'add-to-order' },
+}) {
   const ranges = computeOfferRanges(group.offers)
   const canExpand = !group.loading && group.offers.length > 0
 
@@ -58,7 +64,12 @@ export function SupplierOfferAccordion({ good, group, initialOrderNumber, onTogg
       </CardHeader>
       {group.expanded && group.offers.length > 0 ? (
         <CardContent className="pt-4">
-          <OffersTable good={good} offers={group.offers} initialOrderNumber={initialOrderNumber} />
+          <OffersTable
+            good={good}
+            offers={group.offers}
+            initialOrderNumber={initialOrderNumber}
+            offerAction={offerAction}
+          />
         </CardContent>
       ) : null}
     </Card>

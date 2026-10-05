@@ -9,7 +9,12 @@ import {
   TableRow,
 } from '@/components/ui/table'
 
-export function OffersTable({ good, offers, initialOrderNumber }) {
+export function OffersTable({
+  good,
+  offers,
+  initialOrderNumber,
+  offerAction = { mode: 'add-to-order' },
+}) {
   if (!offers.length) {
     return <SearchEmpty>Нет предложений</SearchEmpty>
   }
@@ -36,6 +41,7 @@ export function OffersTable({ good, offers, initialOrderNumber }) {
               isBest={offer.bestId}
               isFast={offer.isFast}
               initialOrderNumber={initialOrderNumber}
+              offerAction={offerAction}
             />
           ))}
         </TableBody>

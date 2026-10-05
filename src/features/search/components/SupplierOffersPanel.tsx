@@ -9,6 +9,7 @@ export function SupplierOffersPanel({
   initialOrderNumber,
   onToggleSupplier,
   filters,
+  offerAction = { mode: 'add-to-order' },
 }) {
   if (!groups.length) {
     return <SearchEmpty>Нет поставщиков для API-поиска</SearchEmpty>
@@ -34,6 +35,7 @@ export function SupplierOffersPanel({
           group={group}
           initialOrderNumber={initialOrderNumber}
           onToggle={onToggleSupplier}
+          offerAction={offerAction}
         />
       ))}
     </div>
