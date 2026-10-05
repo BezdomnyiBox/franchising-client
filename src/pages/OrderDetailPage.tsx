@@ -353,9 +353,48 @@ export function OrderDetailPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" asChild>
-            <Link to="/orders">К списку</Link>
+          <Button asChild>
+            <Link to={`/search?orderNumber=${displayNumber}`}>
+              <Search className="size-4" />
+              Найти товар
+            </Link>
           </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2 border-b pb-4">
+        {(showNotify || showReNotify || showConfirm) && (
+          <div className="flex flex-wrap gap-2">
+            {showNotify || showReNotify ? (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={notifyMutation.isPending}
+                onClick={handleNotify}
+              >
+                <MessageSquare className="size-4" />
+                {showNotify ? 'Оповестить клиента' : 'Отправить смс повторно'}
+              </Button>
+            ) : null}
+            {showConfirm ? (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={confirmMutation.isPending}
+                onClick={openConfirmDialog}
+              >
+                <CheckCircle className="size-4" />
+                Подтвердить
+              </Button>
+            ) : null}
+          </div>
+        )}
+
+        {(showNotify || showReNotify || showConfirm) && (
+          <div className="mx-1 hidden h-6 w-px bg-border sm:block" aria-hidden />
+        )}
+
+        <div className="flex flex-wrap gap-2">
           {order.mobileHash ? (
             <Button variant="outline" asChild>
               <a
@@ -368,28 +407,19 @@ export function OrderDetailPage() {
               </a>
             </Button>
           ) : null}
-          {showNotify || showReNotify ? (
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={notifyMutation.isPending}
-              onClick={handleNotify}
-            >
-              <MessageSquare className="size-4" />
-              {showNotify ? 'Оповестить клиента' : 'Отправить смс повторно'}
-            </Button>
-          ) : null}
-          {showConfirm ? (
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={confirmMutation.isPending}
-              onClick={openConfirmDialog}
-            >
-              <CheckCircle className="size-4" />
-              Подтвердить
-            </Button>
-          ) : null}
+          <Button type="button" variant="outline" onClick={() => setFormedPrintOpen(true)}>
+            <FileText className="size-4" />
+            Сформировать счёт
+          </Button>
+          <Button type="button" variant="outline" onClick={openCashierPrint}>
+            <Printer className="size-4" />
+            Распечатать чек
+          </Button>
+        </div>
+
+        <div className="mx-1 hidden h-6 w-px bg-border sm:block" aria-hidden />
+
+        <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant="outline"
@@ -403,21 +433,7 @@ export function OrderDetailPage() {
             <Bell className="size-4" />
             Напоминание
           </Button>
-          <Button type="button" variant="outline" onClick={() => setFormedPrintOpen(true)}>
-            <FileText className="size-4" />
-            Сформировать счёт
-          </Button>
-          <Button type="button" variant="outline" onClick={openCashierPrint}>
-            <Printer className="size-4" />
-            Распечатать чек
-          </Button>
           <CopyOrderActions orderId={order.id} variant="button" />
-          <Button asChild>
-            <Link to={`/search?orderNumber=${displayNumber}`}>
-              <Search className="size-4" />
-              Найти товар
-            </Link>
-          </Button>
         </div>
       </div>
 
