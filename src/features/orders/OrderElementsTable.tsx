@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { Copy, Pencil, Plus, ShoppingCart, Zap, X } from 'lucide-react'
+import { Copy, Pencil, Plus, ShoppingCart, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { SearchForOrderDialog } from '@/features/search/SearchForOrderDialog'
 import { patchOrderElementOem } from '@/features/search/api'
@@ -34,9 +34,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
-
-const FAST_ITEMS_ARTICLE = 'fastitems'
-const FAST_ITEMS_PRODUCT_ID = 7025635
 
 function elementBrand(el: OrderElement): string {
   return el.item?.product?.brand?.name || '—'
@@ -224,19 +221,15 @@ export function OrderElementsTable({
   const oemValue = (el: OrderElement) =>
     oemDrafts[el.id] !== undefined ? oemDrafts[el.id] : (el.oem ?? '')
 
-  const openSearch = async (
-    el: OrderElement,
-    saveOemFirst: boolean,
-    overrides?: { article?: string; productId?: number | null },
-  ) => {
+  const openSearch = async (el: OrderElement, saveOemFirst: boolean) => {
     if (!canOpenSearch(orderStatus, el.status)) {
       toast.error('Поиск недоступен для этого статуса')
       return
     }
 
-    const article = overrides?.article ?? oemValue(el).trim()
+    const article = oemValue(el).trim()
 
-    if (saveOemFirst && !overrides) {
+    if (saveOemFirst) {
       setSavingOemId(el.id)
       try {
         await patchOrderElementOem(el.id, article || el.oem || '')
@@ -251,10 +244,7 @@ export function OrderElementsTable({
     setSearchTarget({
       elementId: el.id,
       article,
-      productId:
-        overrides?.productId !== undefined
-          ? overrides.productId
-          : (el.item?.product?.id ?? null),
+      productId: el.item?.product?.id ?? null,
     })
   }
 
@@ -587,22 +577,6 @@ export function OrderElementsTable({
                         onClick={() => void openSearch(el, true)}
                       >
                         <ShoppingCart className="size-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className={cn('px-2', !searchable && 'opacity-40')}
-                        title="Быстрый подбор (fastitems)"
-                        disabled={!searchable || savingOemId === el.id}
-                        onClick={() =>
-                          void openSearch(el, false, {
-                            article: FAST_ITEMS_ARTICLE,
-                            productId: FAST_ITEMS_PRODUCT_ID,
-                          })
-                        }
-                      >
-                        <Zap className="size-4" />
                       </Button>
                       {cancelable ? (
                         <Button
