@@ -1,69 +1,73 @@
 // @ts-nocheck
 import { useState } from 'react'
+import { Plus } from 'lucide-react'
 import { formatAssemblyTime, money } from '../lib/format'
 import { getEtaSpeed, getOfferDays } from '../lib/offers'
 import { AddToOrderModal } from './AddToOrderModal'
+import { EtaDot } from './search-ui'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { TableCell, TableRow } from '@/components/ui/table'
+import { cn } from '@/lib/utils'
 
 export function OfferRow({ good, offer, isBest, isFast, initialOrderNumber }) {
-  const [viewModal, setViewModal] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)
   const supplierLabel = offer.warehousePublicName
     ? offer.warehousePublicName
-    : (offer.supplierName || offer.warehousePublicName || '')
+    : offer.supplierName || offer.warehousePublicName || ''
   const days = getOfferDays(offer)
   const speed = getEtaSpeed(days)
   const displayPrice = offer.offerPrice || offer.price
 
   return (
-    <tr className={isBest ? 'best' : ''}>
-      <td data-l="Склад и поставщик">
-        <span className="cellwh">
-          {isBest ? (
-            <>
-              <span className="badge-best">Рекомендуем</span>
-              <br />
-            </>
-          ) : null}
-          {supplierLabel}
-          <small>
-            {offer.warehousePublicNumber}
-            {offer.rating ? ` ★ ${offer.rating}` : ''}
-          </small>
-        </span>
-      </td>
-      <td data-l="Цена">
-        <span className="pr">
-          {money(Number(displayPrice) || 0)}
-          <small>за 1 шт.</small>
-        </span>
-      </td>
-      <td data-l="Готовность к выдаче">
-        <span className="eta">
-          <span className={`d ${speed}`} />
-          <b>{formatAssemblyTime(offer.assemblyTime)}</b>
-          {isFast ? <small>· самый быстрый</small> : null}
-        </span>
-      </td>
-      <td className="qty" data-l="Кол-во">
-        <b>{offer.stock}</b> <small>шт.</small>
-      </td>
-      <td className="warr" data-l="Гарантия">{offer.warranty || '—'}</td>
-      <td className="act" data-l="Действие">
-        {viewModal ? (
-          <AddToOrderModal
-            good={good}
-            offer={offer}
-            initialOrderNumber={initialOrderNumber}
-            onClose={() => setViewModal(false)}
-          />
-        ) : (
-          <button type="button" className="add" onClick={() => setViewModal(true)}>
-            <svg className="ic" viewBox="0 0 24 24">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+    <>
+      <TableRow className={cn(isBest && 'bg-primary/5')}>
+        <TableCell>
+          <div className="space-y-0.5">
+            {isBest ? (
+              <Badge variant="secondary" className="mb-1 bg-primary/10 text-primary">
+                Рекомендуем
+              </Badge>
+            ) : null}
+            <div className="font-medium">{supplierLabel}</div>
+            <div className="text-xs text-muted-foreground">
+              {offer.warehousePublicNumber}
+              {offer.rating ? ` · ★ ${offer.rating}` : ''}
+            </div>
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="font-medium">{money(Number(displayPrice) || 0)}</div>
+          <div className="text-xs text-muted-foreground">за 1 шт.</div>
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <EtaDot speed={speed} />
+            <div>
+              <div className="font-medium">{formatAssemblyTime(offer.assemblyTime)}</div>
+              {isFast ? <div className="text-xs text-muted-foreground">самый быстрый</div> : null}
+            </div>
+          </div>
+        </TableCell>
+        <TableCell>
+          <span className="font-medium">{offer.stock}</span>{' '}
+          <span className="text-xs text-muted-foreground">шт.</span>
+        </TableCell>
+        <TableCell className="text-muted-foreground">{offer.warranty || '—'}</TableCell>
+        <TableCell className="text-right">
+          <Button type="button" size="sm" onClick={() => setModalOpen(true)}>
+            <Plus className="size-4" />
             В заказ
-          </button>
-        )}
-      </td>
-    </tr>
+          </Button>
+        </TableCell>
+      </TableRow>
+      <AddToOrderModal
+        good={good}
+        offer={offer}
+        initialOrderNumber={initialOrderNumber}
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+      />
+    </>
   )
 }

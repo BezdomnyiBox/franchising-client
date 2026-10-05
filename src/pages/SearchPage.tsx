@@ -8,15 +8,32 @@ export function SearchPage() {
   const orderNumber = params.get('orderNumber') ?? ''
 
   return (
-    <div className="search-page">
-      {orderNumber ? (
-        <div className="mb-3 px-1 text-sm text-muted-foreground">
-          Поиск для заказа{' '}
-          <Link className="underline underline-offset-4" to={`/orders/${orderNumber}`}>
-            #{orderNumber}
-          </Link>
-        </div>
-      ) : null}
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Поиск товаров</h1>
+        <p className="text-sm text-muted-foreground">
+          Поиск по артикулу для добавления в заказ
+          {orderNumber ? (
+            <>
+              .{' '}
+              <Link className="underline underline-offset-4" to={`/orders/${orderNumber}`}>
+                Заказ #{orderNumber}
+              </Link>
+            </>
+          ) : (
+            '. Откройте поиск из карточки заказа или укажите № в URL.'
+          )}
+          {(branchName || branchId) && (
+            <>
+              {' '}
+              ПВ:{' '}
+              <span className="font-medium text-foreground">
+                {branchName || `#${branchId}`}
+              </span>
+            </>
+          )}
+        </p>
+      </div>
       <SearchContainer branchId={branchId} branchName={branchName} />
     </div>
   )

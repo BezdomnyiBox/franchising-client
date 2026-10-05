@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { applyOfferFilters } from '../lib/offers'
 import { SupplierOfferAccordion } from './SupplierOfferAccordion'
+import { SearchEmpty } from './search-ui'
 
 export function SupplierOffersPanel({
   good,
@@ -10,7 +11,7 @@ export function SupplierOffersPanel({
   filters,
 }) {
   if (!groups.length) {
-    return <div className="empty-msg">Нет поставщиков для API-поиска</div>
+    return <SearchEmpty>Нет поставщиков для API-поиска</SearchEmpty>
   }
 
   const visibleGroups = groups
@@ -21,11 +22,11 @@ export function SupplierOffersPanel({
     .filter((group) => group.loading || group.offers.length > 0)
 
   if (!visibleGroups.length) {
-    return <div className="empty-msg">Нет предложений под заказ</div>
+    return <SearchEmpty>Нет предложений под заказ</SearchEmpty>
   }
 
   return (
-    <div className="supplier-offers-list">
+    <div className="space-y-3">
       {visibleGroups.map((group) => (
         <SupplierOfferAccordion
           key={group.alias}

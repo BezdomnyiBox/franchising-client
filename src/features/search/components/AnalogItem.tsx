@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useCallback, useMemo, useRef, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { EMPTY_OFFERS, OFFERS_TAB_AVAILABLE } from '../lib/constants'
 import { formatAssemblyTime, money } from '../lib/format'
 import {
@@ -14,6 +15,10 @@ import {
   loadSupplierOffersParallel,
 } from '../lib/supplierGoodsApi'
 import { OffersMainSection } from './OffersMainSection'
+import { SearchPill } from './search-ui'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 export function AnalogItem({ item, branchId, orderNumber }) {
   const [expanded, setExpanded] = useState(false)
@@ -123,52 +128,54 @@ export function AnalogItem({ item, branchId, orderNumber }) {
   }
 
   return (
-    <div className={`an${expanded ? ' op' : ''}`}>
-      <button type="button" className="an-h" aria-expanded={expanded} onClick={toggleExpanded}>
-        <span className="an-id">
-          <span className="b">
-            {item.brand} <span>/</span> <span className="mono">{item.article}</span>
-          </span>
-          {item.name ? <span className="nm">{item.name}</span> : null}
-        </span>
-        <span className="an-av">
+    <Card className={cn(expanded && 'ring-1 ring-border')}>
+      <Button
+        type="button"
+        variant="ghost"
+        className="h-auto w-full flex-col items-stretch gap-3 px-4 py-3 hover:bg-muted/50 sm:flex-row sm:items-center"
+        aria-expanded={expanded}
+        onClick={toggleExpanded}
+      >
+        <div className="min-w-0 flex-1 space-y-0.5 text-left">
+          <div className="font-medium">
+            {item.brand} <span className="text-muted-foreground">/</span>{' '}
+            <span className="font-mono text-sm">{item.article}</span>
+          </div>
+          {item.name ? <div className="truncate text-sm text-muted-foreground">{item.name}</div> : null}
+        </div>
+        <div className="flex flex-wrap gap-1.5 sm:justify-end">
           {stats.availableCount > 0 ? (
-            <span className="pill ok">
-              <span className="dot" />
+            <SearchPill variant="available">
               {availableLoading ? '…' : `${stats.availableCount} в наличии`}
-            </span>
+            </SearchPill>
           ) : null}
           {stats.offerCount > 0 ? (
-            <span className="pill ord">
-              <span className="dot" />
+            <SearchPill variant="order">
               {offerLoading ? '…' : `${stats.offerCount} под заказ`}
-            </span>
+            </SearchPill>
           ) : null}
           {!stats.availableCount &&
           !stats.offerCount &&
           !availableLoading &&
           !offerLoading &&
           expanded ? (
-            <span className="pill no">
-              <span className="dot" />
-              Нет предложений
-            </span>
+            <SearchPill variant="muted">Нет предложений</SearchPill>
           ) : null}
-        </span>
-        <span className="an-eta">
-          {etaLabel}
-          <small>ближайшая выдача</small>
-        </span>
-        <span className="an-pr">{minPrice ? money(minPrice) : '—'}</span>
-        <span className="an-open">
+        </div>
+        <div className="hidden text-right text-sm sm:block sm:w-28">
+          <div className="font-medium">{etaLabel}</div>
+          <div className="text-xs text-muted-foreground">ближайшая выдача</div>
+        </div>
+        <div className="hidden font-semibold sm:block sm:w-24 sm:text-right">
+          {minPrice ? money(minPrice) : '—'}
+        </div>
+        <div className="flex items-center gap-1 text-sm text-primary sm:w-32 sm:justify-end">
           Предложения
-          <svg className="ic" viewBox="0 0 24 24">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </span>
-      </button>
+          <ChevronDown className={cn('size-4 transition-transform', expanded && 'rotate-180')} />
+        </div>
+      </Button>
       {expanded ? (
-        <div className="an-body">
+        <CardContent className="border-t pt-4">
           <OffersMainSection
             good={details}
             offers={offers}
@@ -180,8 +187,8 @@ export function AnalogItem({ item, branchId, orderNumber }) {
             onToggleSupplier={handleToggleSupplierOffer}
             initialOrderNumber={orderNumber}
           />
-        </div>
+        </CardContent>
       ) : null}
-    </div>
+    </Card>
   )
 }

@@ -28,8 +28,6 @@ import {
   loadSupplierOffersParallel,
   resetOffersLoadTracking,
 } from './lib/supplierGoodsApi'
-import './SearchContainer.css'
-
 type SearchContainerProps = {
   branchId?: number
   branchName?: string
@@ -480,7 +478,7 @@ export function SearchContainer({
   }, [activeTab, articleParam, brandParam, getAnalogs])
 
   return (
-    <div id="search-app">
+    <div className="space-y-6">
       <SearchHeader
         cityLabel={cityLabel}
         searchArticle={searchArticle}
@@ -504,64 +502,49 @@ export function SearchContainer({
         searchedCount={searchedCount}
       />
 
-      <div className="wrap">
-        <div className="cols">
-          {currentGood ? (
-            <ProductSidebar
-              good={currentGood}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        {currentGood ? (
+          <ProductSidebar
+            good={currentGood}
+            offers={offers}
+            analogsCount={analogs.length}
+            loading={availableLoading || offerLoading}
+          />
+        ) : null}
+
+        <main className="min-w-0 flex-1 space-y-4">
+          <section hidden={activeTab !== TAB_SEARCHED}>
+            <SearchedProductPanel
+              articleParam={articleParam}
+              isSearchLoading={isSearchLoading}
+              currentGood={currentGood}
+              brands={brands}
               offers={offers}
-              analogsCount={analogs.length}
-              loading={availableLoading || offerLoading}
+              availableLoading={availableLoading}
+              offerLoading={offerLoading}
+              supplierOfferGroups={supplierOfferGroups}
+              onToggleSupplier={handleToggleSupplierOffer}
+              initialOrderNumber={initialOrderNumber}
+              cities={cities}
+              citiesLoading={citiesLoading}
+              currentTownId={publicBranch.townId}
             />
-          ) : null}
+          </section>
 
-          <main className="main">
-            <section hidden={activeTab !== TAB_SEARCHED}>
-              <SearchedProductPanel
-                articleParam={articleParam}
-                isSearchLoading={isSearchLoading}
-                currentGood={currentGood}
-                brands={brands}
-                offers={offers}
-                availableLoading={availableLoading}
-                offerLoading={offerLoading}
-                supplierOfferGroups={supplierOfferGroups}
-                onToggleSupplier={handleToggleSupplierOffer}
-                initialOrderNumber={initialOrderNumber}
-                cities={cities}
-                citiesLoading={citiesLoading}
-                currentTownId={publicBranch.townId}
-              />
-            </section>
-
-            <section hidden={activeTab !== TAB_ANALOGS}>
-              <AnalogsPanel
-                currentGood={currentGood}
-                offerStats={offerStats}
-                onBackToOffers={setActiveTab}
-                analogsLoading={analogsLoading}
-                analogs={analogs}
-                branchId={branchId}
-                initialOrderNumber={initialOrderNumber}
-                articleParam={articleParam}
-                brandParam={brandParam}
-              />
-            </section>
-          </main>
-        </div>
-      </div>
-
-      <div className="toast" id="toast">
-        <span className="k">
-          <svg
-            className="ic"
-            viewBox="0 0 24 24"
-            style={{ stroke: '#fff', width: 13, height: 13 }}
-          >
-            <path d="M20 6L9 17l-5-5" />
-          </svg>
-        </span>
-        <span id="toastText">Готово</span>
+          <section hidden={activeTab !== TAB_ANALOGS}>
+            <AnalogsPanel
+              currentGood={currentGood}
+              offerStats={offerStats}
+              onBackToOffers={setActiveTab}
+              analogsLoading={analogsLoading}
+              analogs={analogs}
+              branchId={branchId}
+              initialOrderNumber={initialOrderNumber}
+              articleParam={articleParam}
+              brandParam={brandParam}
+            />
+          </section>
+        </main>
       </div>
     </div>
   )

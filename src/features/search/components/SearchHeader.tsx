@@ -1,6 +1,10 @@
 // @ts-nocheck
+import { MapPin, Search, X } from 'lucide-react'
 import { BrandSelector } from './BrandSelector'
 import { SearchTabs } from './SearchTabs'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 
 export function SearchHeader({
   cityLabel,
@@ -18,29 +22,21 @@ export function SearchHeader({
   searchedCount,
 }) {
   return (
-    <div className="searchzone">
-      <div className="sz-in">
-        <div className="city">
-          Наличие и стоимость для города
-          <button type="button">
-            <svg className="ic" viewBox="0 0 24 24">
-              <path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11z" />
-              <circle cx="12" cy="10" r="2.6" />
-            </svg>
-            {cityLabel}
-            <svg className="ic" viewBox="0 0 24 24">
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          </button>
-          <span className="sp" />
-        </div>
-        <div className="qrow">
-          <div className="qbox">
-            <svg className="ic ic-l" viewBox="0 0 24 24">
-              <circle cx="11" cy="11" r="7" />
-              <path d="M21 21l-4.3-4.3" />
-            </svg>
-            <input
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Поиск по артикулу</CardTitle>
+        <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <MapPin className="size-4 shrink-0" />
+          Наличие и стоимость для города{' '}
+          <span className="font-medium text-foreground">{cityLabel}</span>
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-9 pr-9"
               placeholder="Артикул"
               value={searchArticle}
               onChange={(event) => onArticleChange(event.target.value)}
@@ -48,31 +44,30 @@ export function SearchHeader({
                 if (event.key === 'Enter') onSearch(event.target.value)
               }}
             />
-            <button className="clr" title="Очистить" type="button" onClick={onClear}>
-              <svg className="ic" viewBox="0 0 24 24">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
-            </button>
+            {searchArticle ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2"
+                title="Очистить"
+                onClick={onClear}
+              >
+                <X className="size-4" />
+              </Button>
+            ) : null}
           </div>
-          <div className="scope">
-            <button type="button" className="on">Артикул</button>
-            <button type="button">Название</button>
-            <button type="button">По каталогу</button>
-            <button type="button">Масла</button>
-          </div>
-          <button
+          <Button
             type="button"
-            className="qgo"
-            disabled={!searchArticle}
+            className="shrink-0 sm:w-auto"
+            disabled={!searchArticle?.trim()}
             onClick={() => onSearch(searchArticle)}
           >
-            <svg className="ic" viewBox="0 0 24 24">
-              <circle cx="11" cy="11" r="7" />
-              <path d="M21 21l-4.3-4.3" />
-            </svg>
+            <Search className="size-4" />
             Искать
-          </button>
+          </Button>
         </div>
+
         <BrandSelector
           key={articleParam}
           brands={brands}
@@ -85,7 +80,7 @@ export function SearchHeader({
           analogsCount={analogsCount}
           searchedCount={searchedCount}
         />
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }

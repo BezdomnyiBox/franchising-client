@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { ClipboardList, LogOut, PackagePlus, Search, Store } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/features/auth/AuthContext'
@@ -13,9 +13,6 @@ const nav = [
 export function AppShell() {
   const { user, branchId, branchName, logout } = useAuth()
   const navigate = useNavigate()
-  const location = useLocation()
-  const isSearch = location.pathname === '/search' || location.pathname.endsWith('/search')
-
   const onLogout = async () => {
     await logout()
     navigate('/login', { replace: true })
@@ -24,12 +21,7 @@ export function AppShell() {
   return (
     <div className="min-h-svh bg-background text-foreground">
       <header className="sticky top-0 z-20 border-b bg-background/90 backdrop-blur">
-        <div
-          className={cn(
-            'mx-auto flex h-14 items-center gap-4 px-4',
-            isSearch ? 'max-w-[1560px]' : 'max-w-6xl',
-          )}
-        >
+        <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
           <div className="flex items-center gap-2 font-semibold tracking-tight">
             <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
               <Store className="size-4" />
@@ -73,12 +65,7 @@ export function AppShell() {
           </div>
         </div>
       </header>
-      <main
-        className={cn(
-          'mx-auto',
-          isSearch ? 'max-w-[1560px] px-0 py-0' : 'max-w-6xl px-4 py-6',
-        )}
-      >
+      <main className="mx-auto max-w-7xl px-4 py-6">
         <Outlet />
       </main>
     </div>

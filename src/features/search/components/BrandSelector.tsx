@@ -1,7 +1,9 @@
 // @ts-nocheck
 import { useState } from 'react'
+import { X } from 'lucide-react'
 import { BRANDS_PREVIEW_COUNT } from '../lib/constants'
 import { formatBrandsMoreCount } from '../lib/format'
+import { Button } from '@/components/ui/button'
 
 export function BrandSelector({ brands, selectedBrand, onSelect }) {
   const [expanded, setExpanded] = useState(false)
@@ -12,27 +14,28 @@ export function BrandSelector({ brands, selectedBrand, onSelect }) {
   const hiddenCount = brands.length - visibleBrands.length
 
   return (
-    <div className="brandline">
-      <span>Бренд:</span>
-      {visibleBrands.map((brand) => (
-        <button
-          key={brand}
-          type="button"
-          className={`bchip${selectedBrand === brand ? ' on' : ''}`}
-          onClick={() => onSelect(brand)}
-        >
-          {brand}
-          {selectedBrand === brand ? (
-            <svg className="ic" viewBox="0 0 24 24" style={{ width: 12, height: 12 }}>
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          ) : null}
-        </button>
-      ))}
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-sm text-muted-foreground">Бренд:</span>
+      {visibleBrands.map((brand) => {
+        const active = selectedBrand === brand
+        return (
+          <Button
+            key={brand}
+            type="button"
+            size="sm"
+            variant={active ? 'default' : 'outline'}
+            className="gap-1.5"
+            onClick={() => onSelect(brand)}
+          >
+            {brand}
+            {active ? <X className="size-3" /> : null}
+          </Button>
+        )
+      })}
       {hiddenCount > 0 ? (
-        <button type="button" className="bmore" onClick={() => setExpanded(true)}>
+        <Button type="button" size="sm" variant="ghost" onClick={() => setExpanded(true)}>
           {formatBrandsMoreCount(hiddenCount)}
-        </button>
+        </Button>
       ) : null}
     </div>
   )

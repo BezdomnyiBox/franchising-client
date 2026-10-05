@@ -1,9 +1,20 @@
 // @ts-nocheck
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { BACK_HOST } from '../lib/constants'
-import { formatAssemblyTime } from '../lib/format'
+import { formatAssemblyTime, money } from '../lib/format'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
-export function AddToOrderModal({ good, offer, initialOrderNumber = '', onClose }) {
+export function AddToOrderModal({ good, offer, initialOrderNumber = '', open, onOpenChange }) {
   const [orderNumber, setOrderNumber] = useState(initialOrderNumber || '')
 
   const handleAddToOrder = () => {
@@ -32,72 +43,51 @@ export function AddToOrderModal({ good, offer, initialOrderNumber = '', onClose 
         if (result.result === 'success') window.alert('Товар добавлен в заказ')
         else window.alert(result.message)
       })
-      .then(() => onClose())
+      .then(() => onOpenChange(false))
       .catch((error) => {
         window.alert(error.message)
-        onClose()
+        onOpenChange(false)
       })
   }
 
-  useEffect(() => {
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
+  const displayPrice = offer.offerPrice ?? offer.price
 
   return (
-    <div className="search-modal-backdrop" onClick={onClose} role="presentation">
-      <div
-        className="search-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="add-to-order-title"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="search-modal__title">
-          <h2 id="add-to-order-title" className="search-modal__heading">
-            Добавить товар в заказ
-          </h2>
-          <p className="search-modal__line">
-            {good.brand} / {good.article}
-          </p>
-          <p className="search-modal__line">{good.name}</p>
-          <p className="search-modal__line">Цена: {offer.offerPrice} руб.</p>
-          <p className="search-modal__line">
-            Срок поставки: {formatAssemblyTime(offer.assemblyTime)}
-          </p>
-          <p className="search-modal__line">
-            Склад: {offer.warehousePublicName} ({offer.warehousePublicNumber})
-          </p>
-          <label className="search-modal__label" htmlFor="order-number-input">
-            Номер заказа
-          </label>
-          <input
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Добавить товар в заказ</DialogTitle>
+          <DialogDescription asChild>
+            <div className="space-y-1 pt-1 text-sm">
+              <p>
+                {good.brand} / <span className="font-mono text-xs">{good.article}</span>
+              </p>
+              <p>{good.name}</p>
+              <p>Цена: {money(Number(displayPrice) || 0)}</p>
+              <p>Срок поставки: {formatAssemblyTime(offer.assemblyTime)}</p>
+              <p>
+                Склад: {offer.warehousePublicName} ({offer.warehousePublicNumber})
+              </p>
+            </div>
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor="order-number-input">Номер заказа</Label>
+          <Input
             id="order-number-input"
-            className="search-modal__field"
             value={orderNumber}
             onChange={(event) => setOrderNumber(event.target.value)}
           />
         </div>
-        <div className="search-modal__actions">
-          <button
-            type="button"
-            className="search-btn search-btn--outlined-secondary"
-            onClick={onClose}
-          >
+        <DialogFooter className="border-0 bg-transparent p-0 sm:justify-end">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Отменить
-          </button>
-          <button
-            type="button"
-            className="search-btn search-btn--contained-primary"
-            onClick={handleAddToOrder}
-          >
+          </Button>
+          <Button type="button" onClick={handleAddToOrder}>
             Добавить
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

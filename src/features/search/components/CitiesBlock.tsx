@@ -1,7 +1,11 @@
 // @ts-nocheck
 import { useState } from 'react'
+import { ArrowRight, Globe } from 'lucide-react'
 import { CITIES_PREVIEW_COUNT } from '../lib/constants'
 import { formatCitiesMoreCount, formatWarehouseCount } from '../lib/format'
+import { SearchEmpty, SearchLoading, SearchPill } from './search-ui'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export function CitiesBlock({ cities, loading, article, currentTownId }) {
   const [expanded, setExpanded] = useState(false)
@@ -15,70 +19,60 @@ export function CitiesBlock({ cities, loading, article, currentTownId }) {
   const hiddenCount = otherCities.length - visibleCities.length
 
   return (
-    <div className="card" id="cities">
-      <div className="c-h">
-        <span className="i">
-          <svg className="ic ic-l" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3z" />
-          </svg>
-        </span>
-        <div className="t">
-          <b>Наличие в других городах</b>
-          <div>Доставка транспортной компанией · только наличие</div>
+    <Card id="cities">
+      <CardHeader className="flex-row flex-wrap items-start gap-3 space-y-0 pb-3">
+        <Globe className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1 space-y-1">
+          <CardTitle className="text-base">Наличие в других городах</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Доставка транспортной компанией · только наличие
+          </p>
         </div>
-        {article ? (
-          <span className="pill no">
-            <span className="dot" />
-            {article}
-          </span>
-        ) : null}
-      </div>
-      {loading && !otherCities.length ? (
-        <div className="empty-msg">Загрузка городов...</div>
-      ) : (
-        visibleCities.map((city) => {
-          const available = Number(city.available) || 0
-          const api = Number(city.api) || 0
+        {article ? <SearchPill variant="muted">{article}</SearchPill> : null}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {loading && !otherCities.length ? (
+          <SearchLoading label="Загрузка городов…" />
+        ) : (
+          visibleCities.map((city) => {
+            const available = Number(city.available) || 0
+            const api = Number(city.api) || 0
 
-          return (
-            <div className="crow" key={city.id}>
-              <div className="cn">
-                <b>{city.name}</b>
+            return (
+              <div
+                key={city.id}
+                className="flex flex-col gap-2 border-b pb-3 last:border-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="font-medium">{city.name}</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {available > 0 ? (
+                    <SearchPill variant="available">
+                      В наличии · {formatWarehouseCount(available)}
+                    </SearchPill>
+                  ) : null}
+                  {api > 0 ? (
+                    <SearchPill variant="order">
+                      Под заказ · {formatWarehouseCount(api)}
+                    </SearchPill>
+                  ) : null}
+                  {available === 0 && api === 0 ? (
+                    <SearchPill variant="muted">Нет наличия</SearchPill>
+                  ) : null}
+                  <Button type="button" size="sm" variant="ghost" className="gap-1" data-city={city.name}>
+                    Открыть поиск
+                    <ArrowRight className="size-4" />
+                  </Button>
+                </div>
               </div>
-              {available > 0 ? (
-                <span className="pill ok">
-                  <span className="dot" />
-                  В наличии · {formatWarehouseCount(available)}
-                </span>
-              ) : null}
-              {api > 0 ? (
-                <span className="pill ord">
-                  <span className="dot" />
-                  Под заказ · {formatWarehouseCount(api)}
-                </span>
-              ) : null}
-              {available === 0 && api === 0 ? (
-                <span className="pill no">
-                  <span className="dot" />
-                  Нет наличия
-                </span>
-              ) : null}
-              <button type="button" className="an-open go" data-city={city.name}>
-                Открыть поиск
-                <svg className="ic" viewBox="0 0 24 24">
-                  <path d="M5 12h14M13 6l6 6-6 6" />
-                </svg>
-              </button>
-            </div>
-          )
-        })
-      )}
-      {hiddenCount > 0 ? (
-        <button type="button" className="c-more" onClick={() => setExpanded(true)}>
-          {formatCitiesMoreCount(hiddenCount)}
-        </button>
-      ) : null}
-    </div>
+            )
+          })
+        )}
+        {hiddenCount > 0 ? (
+          <Button type="button" variant="link" className="h-auto p-0" onClick={() => setExpanded(true)}>
+            {formatCitiesMoreCount(hiddenCount)}
+          </Button>
+        ) : null}
+      </CardContent>
+    </Card>
   )
 }

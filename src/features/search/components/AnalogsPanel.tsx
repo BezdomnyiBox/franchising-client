@@ -1,7 +1,13 @@
 // @ts-nocheck
+import { ArrowRight } from 'lucide-react'
 import { TAB_SEARCHED } from '../lib/constants'
 import { money } from '../lib/format'
 import { AnalogItem } from './AnalogItem'
+import { SearchEmpty, SearchLoading } from './search-ui'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
 
 export function AnalogsPanel({
   currentGood,
@@ -15,33 +21,36 @@ export function AnalogsPanel({
   brandParam,
 }) {
   return (
-    <div className="card">
+    <Card>
       {currentGood ? (
-        <div className="orig">
-          <span className="tag">Искомая запчасть</span>
-          <span style={{ fontWeight: 700 }}>
-            {currentGood.brand} / <span className="mono">{currentGood.article}</span>
-          </span>
-          <span style={{ color: 'var(--muted)', fontSize: 12.5 }}>
+        <CardHeader className="space-y-3 pb-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary">Искомая запчасть</Badge>
+            <span className="font-semibold">
+              {currentGood.brand} / <span className="font-mono text-sm">{currentGood.article}</span>
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">
             {currentGood.name || '—'}
             {offerStats.minPrice ? ` · от ${money(offerStats.minPrice)}` : ''}
             {offerStats.nearestEta ? ` · ${offerStats.nearestEta}` : ''}
-          </span>
-          <span className="sp" />
-          <button type="button" className="an-open" onClick={() => onBackToOffers(TAB_SEARCHED)}>
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="w-fit gap-1"
+            onClick={() => onBackToOffers(TAB_SEARCHED)}
+          >
             К предложениям
-            <svg className="ic" viewBox="0 0 24 24">
-              <path d="M5 12h14M13 6l6 6-6 6" />
-            </svg>
-          </button>
-        </div>
+            <ArrowRight className="size-4" />
+          </Button>
+        </CardHeader>
       ) : null}
-      <div id="anlist">
+      {currentGood ? <Separator /> : null}
+      <CardContent className="space-y-2 pt-6">
         {analogsLoading ? (
-          <div className="loading-card">
-            <span className="loading-card__spinner" aria-label="Загрузка" />
-            <span>Загрузка аналогов...</span>
-          </div>
+          <SearchLoading label="Загрузка аналогов…" />
         ) : analogs.length ? (
           analogs.map((item) => (
             <AnalogItem
@@ -52,13 +61,13 @@ export function AnalogsPanel({
             />
           ))
         ) : (
-          <div className="empty-msg">
+          <SearchEmpty>
             {articleParam && brandParam
               ? 'Аналоги не найдены'
               : 'Введите артикул и выберите бренд'}
-          </div>
+          </SearchEmpty>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }

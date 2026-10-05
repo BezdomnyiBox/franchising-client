@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { OffersMainSection } from './OffersMainSection'
+import { SearchEmpty, SearchLoading } from './search-ui'
+import { Card, CardContent } from '@/components/ui/card'
 
 export function SearchedProductPanel({
   articleParam,
@@ -17,15 +19,22 @@ export function SearchedProductPanel({
   currentTownId,
 }) {
   if (!articleParam) {
-    return <div className="card empty-msg">Введите артикул для поиска</div>
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <SearchEmpty>Введите артикул для поиска</SearchEmpty>
+        </CardContent>
+      </Card>
+    )
   }
 
   if (isSearchLoading) {
     return (
-      <div className="card loading-card" aria-live="polite" aria-busy="true">
-        <span className="loading-card__spinner" aria-label="Загрузка" />
-        <span>Идёт поиск товара...</span>
-      </div>
+      <Card>
+        <CardContent className="pt-6">
+          <SearchLoading label="Идёт поиск товара…" />
+        </CardContent>
+      </Card>
     )
   }
 
@@ -49,8 +58,12 @@ export function SearchedProductPanel({
   }
 
   return (
-    <div className="card empty-msg">
-      {brands.length ? 'Нет товаров для выбранного бренда' : 'Информации о товаре нет'}
-    </div>
+    <Card>
+      <CardContent className="pt-6">
+        <SearchEmpty>
+          {brands.length ? 'Нет товаров для выбранного бренда' : 'Информации о товаре нет'}
+        </SearchEmpty>
+      </CardContent>
+    </Card>
   )
 }
