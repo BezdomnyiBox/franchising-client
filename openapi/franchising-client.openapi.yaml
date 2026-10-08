@@ -1,22 +1,20 @@
 openapi: 3.1.0
 info:
   title: Franchising Client API
-  version: 0.2.0
+  version: 0.3.0
   description: |
-    API для менеджера франшизы (ПВ). Логика совпадает с CRM franchising,
-    но доступ ограничен своим пунктом выдачи и своими заказами.
+    Контракт клиента франшизы (ПВ) с backend_7x.
+    Пути ниже — относительно server url `/crm_fr/api/franchising`
+    (axios `baseURL` = `FRANCHISING_API_BASE`).
+    Gateway срезает `/crm_fr/api`; на back остаётся префикс `/franchising`.
 
-    Контракт зафиксирован для согласования с бэкендом.
-    Часть путей уже существует в CRM; поля scope/enforce — требования к hardening.
-
-    ## Auth (отдельно от сайта/CRM)
-    Cookie `franchising_auth` (HttpOnly, HMAC). Не использует `/login_user` и cookie `user`.
-    Логин: `POST /franchising/auth/login` JSON `{ phone, password }`.
+    Cookie `franchising_auth` (HttpOnly). Не использует `/login_user` и cookie `user`.
+    Логин: `POST /auth/login` JSON `{ phone, password }`.
     Только роль `franchising` или manager с `branchId`.
-    `GET /franchising/auth/me` — текущий пользователь.
-    Logout: `POST /franchising/auth/logout`.
-    Для существующих order/search API CRM request-bridge мапит валидный
-    `franchising_auth` → in-memory cookie `user` на время запроса (старая логика не меняется).
+    `GET /auth/me` — текущий пользователь.
+    Logout: `POST /auth/logout`.
+
+    Фото товаров — `SITE_HOST` (`/image/{id}.jpg`), не этот API.
 
     ## Enforce ПВ (обязательно на сервере)
     1. Пользователь с ролью franchising (или эквивалент) и `manager.branchId`.
@@ -28,8 +26,8 @@ info:
     6. Запретить повышение прав через подмену branchId в теле/query.
 
 servers:
-  - url: /crm_fr/api
-    description: Same-origin gateway (Vite / Apache / Nginx → backend)
+  - url: /crm_fr/api/franchising
+    description: Same-origin gateway → backend_7x (/franchising)
 
 tags:
   - name: Auth
@@ -38,7 +36,7 @@ tags:
   - name: OrderElements
 
 paths:
-  /franchising/auth/login:
+  /auth/login:
     post:
       tags: [Auth]
       summary: Логин менеджера ПВ (отдельный от сайта/CRM)
@@ -72,7 +70,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /franchising/auth/logout:
+  /auth/logout:
     post:
       tags: [Auth]
       summary: Выход (очистка cookie franchising_auth)
@@ -81,7 +79,7 @@ paths:
         '200':
           description: OK + Set-Cookie clear
 
-  /franchising/auth/me:
+  /auth/me:
     get:
       tags: [Auth]
       summary: Текущий менеджер ПВ (franchising auth)
@@ -89,24 +87,6 @@ paths:
       responses:
         '200':
           description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FranchiseUser'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  /user/crm_info:
-    get:
-      tags: [Auth]
-      summary: Текущий пользователь менеджера франшизы
-      operationId: getCurrentUser
-      description: |
-        Клиент считает сессию валидной только если есть непустой `permissions.pages`.
-        Для franchising-клиента дополнительно ожидается роль/признак ПВ и manager.branchId.
-      responses:
-        '200':
-          description: OK (или «гость» без permissions — legacy CRM)
           content:
             application/json:
               schema:
@@ -230,6 +210,72 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /order/{orderId}/field_data/customer:
+    get:
+      tags: [Orders]
+      summary: Данные клиента заказа
+      operationId: getOrderCustomer
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Объект клиента или пустой массив (legacy)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/OrderCustomerFieldData'
+                  - type: array
+                    maxItems: 0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order/{orderId}/field_data/status:
+    get:
+      tags: [Orders]
+      summary: Статус заказа и история
+      operationId: getOrderStatus
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: OK или пустой массив
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/OrderStatusFieldData'
+                  - type: array
+                    maxItems: 0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order/{orderId}/field_data/payments:
+    get:
+      tags: [Orders]
+      summary: Оплаты заказа
+      operationId: getOrderPayments
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: OK или пустой массив
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/OrderPaymentsFieldData'
+                  - type: array
+                    maxItems: 0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /order/{orderId}/elements_for_manager_order_interface:
     get:
@@ -478,6 +524,75 @@ paths:
                   orderId:
                     type: integer
                     description: Публичный номер нового заказа (getNumber)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order/change_customer/{orderId}/{field}:
+    post:
+      tags: [Orders]
+      summary: Изменить поле клиента заказа
+      operationId: changeOrderCustomerField
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+        - name: field
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [firstname, lastname, fathername, phone, email]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: Тело как в CRM (значение поля и связанные ключи)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /order/{orderId}/change_car:
+    post:
+      tags: [Orders]
+      summary: Изменить автомобиль заказа
+      operationId: changeOrderCar
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action: { type: string }
+                id:
+                  oneOf:
+                    - { type: integer }
+                    - { type: 'null' }
+                brand: { type: string }
+                model: { type: string }
+                vin: { type: string }
+                carNumber: { type: string }
+                carNumberRegion: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeResult'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -883,6 +998,113 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /product/search/{productId}/count:
+    get:
+      tags: [Search]
+      summary: Счётчики предложений и аналогов
+      operationId: searchProductCount
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: orderId
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductSearchCount'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /order_element/{elementId}/set_item/{itemId}:
+    post:
+      tags: [OrderElements]
+      summary: Привязать складскую позицию к строке заказа
+      operationId: setOrderElementItem
+      parameters:
+        - $ref: '#/components/parameters/OrderElementId'
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                searchProductId:
+                  oneOf:
+                    - { type: integer }
+                    - { type: 'null' }
+                our_products_in_search_result:
+                  type: array
+                  items: {}
+                is_margin: { type: boolean }
+                lineNumber: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeResult'
+
+  /order_element/{elementId}/set_offer_product:
+    post:
+      tags: [OrderElements]
+      summary: Подставить оффер поставщика в строку заказа
+      operationId: setOrderElementOfferProduct
+      parameters:
+        - $ref: '#/components/parameters/OrderElementId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetOfferProductRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeResult'
+
+  /order_element/{elementId}/add_accompanying_item:
+    post:
+      tags: [OrderElements]
+      summary: Добавить сопутствующую позицию
+      operationId: addAccompanyingItem
+      parameters:
+        - $ref: '#/components/parameters/OrderElementId'
+      responses:
+        '200':
+          description: OK
+
+  /order_element/{elementId}/oem:
+    patch:
+      tags: [OrderElements]
+      summary: Изменить OEM/артикул строки
+      operationId: patchOrderElementOem
+      parameters:
+        - $ref: '#/components/parameters/OrderElementId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderElementValueString'
+      responses:
+        '200':
+          description: OK
+
 components:
   parameters:
     OrderId:
@@ -935,6 +1157,98 @@ components:
       required: [value]
       properties:
         value: { type: string }
+    ChangeResult:
+      type: object
+      properties:
+        result: { type: string, example: success }
+        message: { type: string }
+        error: { type: string }
+        orderId: { type: integer }
+    OrderCustomerFieldData:
+      type: object
+      properties:
+        id:
+          oneOf:
+            - { type: integer }
+            - { type: 'null' }
+        fullName: { type: string }
+        firstname: { type: string }
+        lastname: { type: string }
+        fathername: { type: string }
+        phone: { type: string }
+        email: { type: string }
+        type: { type: string }
+        typeDescription: { type: string }
+        isInBlackList: { type: boolean }
+    OrderStatusFieldData:
+      type: object
+      required: [status, statusDescription, history]
+      properties:
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        statusDescription: { type: string }
+        history:
+          type: array
+          items:
+            type: object
+            properties:
+              status: { type: string }
+              description: { type: string }
+              date: { type: string }
+              color: { type: string }
+        refusingReason:
+          oneOf:
+            - { type: string }
+            - { type: 'null' }
+        refusingReasonComment:
+          oneOf:
+            - { type: string }
+            - { type: 'null' }
+    OrderPaymentsFieldData:
+      type: object
+      required: [payments, paymentAmount]
+      properties:
+        payments:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              description: { type: string }
+              price: { type: number }
+              date: { type: string }
+        paymentAmount: { type: number }
+        isSuccessBankPayment: { type: boolean }
+    ProductSearchCount:
+      type: object
+      properties:
+        search_product_items_count: { type: integer }
+        search_analogs_items_count: { type: integer }
+        search_our_analogs_items_count: { type: integer }
+        search_analogs_parts_items_count: { type: integer }
+        search_our_analogs_parts_items_count: { type: integer }
+        ourProductsInSearchResult:
+          type: array
+          items: { type: integer }
+    SetOfferProductRequest:
+      type: object
+      required: [brand, article]
+      properties:
+        brand: { type: string }
+        article: { type: string }
+        name: { type: string }
+        price: { type: number }
+        offerPrice: { type: number }
+        quantity: { type: number }
+        warehouseVendorId:
+          oneOf:
+            - { type: string }
+            - { type: integer }
+        supplierAlias: { type: string }
+        deliveryDuration: { type: integer }
+        multiplicity: { type: integer }
+        productId: { type: integer }
+        brandId: { type: integer }
     FranchiseUser:
       type: object
       required: [id, roles, manager]

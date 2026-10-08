@@ -93,7 +93,7 @@ Env:
 
 ## OpenAPI
 
-Черновик контракта с бэкендом: [`openapi/franchising-client.openapi.yaml`](./openapi/franchising-client.openapi.yaml).
+Контракт с бэкендом (`/crm_fr/api/franchising`): [`openapi/franchising-client.openapi.yaml`](./openapi/franchising-client.openapi.yaml).
 
 Ключевые требования к API:
 
