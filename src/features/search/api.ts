@@ -1,5 +1,5 @@
 import { http } from '@/shared/api/http'
-import { SITE_HOST } from '@/shared/config'
+import { FRANCHISING_API_BASE, SITE_HOST } from '@/shared/config'
 import type {
   ProductOffer,
   ProductSearchCount,
@@ -27,9 +27,33 @@ export function resolveProductImageUrl(url: string): string {
     return `${SITE_HOST}${url}`
   }
   if (url.startsWith('/')) {
-    return `${SITE_HOST}${url}`
+    return `${FRANCHISING_API_BASE}${url}`
   }
   return url
+}
+
+export interface AddOfferProductPayload {
+  orderNumber: string
+  brand: string
+  article: string
+  name?: string
+  price?: number
+  offerPrice?: number
+  quantity?: number
+  warehouseVendorId?: string | number
+  supplierAlias?: string
+  deliveryDuration?: number
+  multiplicity?: number
+}
+
+export async function addOfferProductToOrder(
+  payload: AddOfferProductPayload,
+): Promise<{ result?: string; message?: string }> {
+  const { data } = await http.post<{ result?: string; message?: string }>(
+    '/order/add_offer_product',
+    payload,
+  )
+  return data ?? { result: 'success' }
 }
 
 export function mapSearchOffer(raw: ProductOffer, index: number): ProductOffer {

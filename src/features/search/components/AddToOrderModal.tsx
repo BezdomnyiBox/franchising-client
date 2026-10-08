@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useState } from 'react'
-import { BACK_HOST } from '../lib/constants'
+import { addOfferProductToOrder } from '../api'
 import { formatAssemblyTime, money } from '../lib/format'
 import { Button } from '@/components/ui/button'
 import {
@@ -20,32 +20,27 @@ export function AddToOrderModal({ good, offer, initialOrderNumber = '', open, on
   const handleAddToOrder = () => {
     if (!orderNumber) return
 
-    fetch(`${BACK_HOST}/order/add_offer_product`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderNumber,
-        brand: good.brand,
-        article: good.article,
-        name: good.name,
-        price: offer.price,
-        offerPrice: offer.offerPrice,
-        quantity: offer.stock,
-        warehouseVendorId: offer.warehouseVendorId,
-        supplierAlias: offer.supplierAlias,
-        deliveryDuration: offer.deliveryDuration,
-        multiplicity: offer.multiplicity,
-      }),
+    addOfferProductToOrder({
+      orderNumber,
+      brand: good.brand,
+      article: good.article,
+      name: good.name,
+      price: offer.price,
+      offerPrice: offer.offerPrice,
+      quantity: offer.stock,
+      warehouseVendorId: offer.warehouseVendorId,
+      supplierAlias: offer.supplierAlias,
+      deliveryDuration: offer.deliveryDuration,
+      multiplicity: offer.multiplicity,
     })
-      .then((response) => response.json())
       .then((result) => {
         if (result.result === 'success') window.alert('Товар добавлен в заказ')
         else window.alert(result.message)
       })
       .then(() => onOpenChange(false))
       .catch((error) => {
-        window.alert(error.message)
+        const data = error?.response?.data
+        window.alert(data?.message || data?.error || error.message)
         onOpenChange(false)
       })
   }

@@ -160,6 +160,7 @@ export function SearchContainer({
 
             autoBrandAppliedRef.current = selectKey;
             setSearchBrand(brand);
+            skipUrlBrandFetchRef.current = true;
             updateSearchUrl(article, brand, orderNumber, { replace: true });
         },
         [localQuery.brand, searchParams, syncUrl, updateSearchUrl],
@@ -462,7 +463,13 @@ export function SearchContainer({
         skipUrlBrandFetchRef.current = true;
         updateSearchUrl(nextArticle, "", orderNumberValue);
         getBrandVariants(nextArticle, "", orderNumberValue);
-        if (nextArticle === articleParam && orderNumberValue === orderNumberParam) {
+        const sameArticle = nextArticle === articleParam.trim();
+        const sameOrder = orderNumberValue === orderNumberParam.trim();
+        const urlWillChange =
+            articleParam !== nextArticle ||
+            orderNumberParam !== orderNumberValue ||
+            brandParam !== "";
+        if (sameArticle && sameOrder && !urlWillChange) {
             skipUrlBrandFetchRef.current = false;
         }
     };
@@ -476,6 +483,7 @@ export function SearchContainer({
         });
         setSearchBrand(brand);
         setOffers(EMPTY_OFFERS);
+        skipUrlBrandFetchRef.current = true;
         updateSearchUrl(
             articleParam,
             brand,
@@ -510,7 +518,7 @@ export function SearchContainer({
             return;
         }
         getBrandVariantsRef.current(articleParam, brandParam, orderNumberParam);
-    }, [articleParam, orderNumberParam]);
+    }, [articleParam, brandParam, orderNumberParam]);
 
     useEffect(() => {
         if (!articleParam || brandParam || brandsLoading || !brands.length) return;
